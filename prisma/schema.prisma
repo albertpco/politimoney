@@ -1,0 +1,438 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model IngestRun {
+  runId                String               @id
+  startedAt            DateTime
+  finishedAt           DateTime
+  cycle                Int
+  cycles               Json                 @default("[]")
+  candidateLimit       Int
+  fecCommitteeLimit    Int
+  fecContributionLimit Int
+  faraRegistrantLimit  Int
+  warnings             Json
+  sources              Json
+  totals               Json
+  createdAt            DateTime             @default(now())
+  rawFecCandidates     RawFecCandidate[]
+  rawFecCommittees     RawFecCommittee[]
+  rawFecContributions  RawFecContribution[]
+  rawCongressBills     RawCongressBill[]
+  rawStateOutcomes     RawStateOutcome[]
+}
+
+model RawFecCandidate {
+  id             BigInt    @id @default(autoincrement())
+  runId          String
+  sourceRecordId String
+  payloadHash    String
+  payload        Json
+  ingestedAt     DateTime  @default(now())
+  run            IngestRun @relation(fields: [runId], references: [runId], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([sourceRecordId])
+}
+
+model RawFecCommittee {
+  id             BigInt    @id @default(autoincrement())
+  runId          String
+  sourceRecordId String
+  payloadHash    String
+  payload        Json
+  ingestedAt     DateTime  @default(now())
+  run            IngestRun @relation(fields: [runId], references: [runId], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([sourceRecordId])
+}
+
+model RawFecContribution {
+  id             BigInt    @id @default(autoincrement())
+  runId          String
+  sourceRecordId String
+  payloadHash    String
+  payload        Json
+  ingestedAt     DateTime  @default(now())
+  run            IngestRun @relation(fields: [runId], references: [runId], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([sourceRecordId])
+}
+
+model RawCongressBill {
+  id             BigInt    @id @default(autoincrement())
+  runId          String
+  sourceRecordId String
+  payloadHash    String
+  payload        Json
+  ingestedAt     DateTime  @default(now())
+  run            IngestRun @relation(fields: [runId], references: [runId], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([sourceRecordId])
+}
+
+model RawStateOutcome {
+  id             BigInt    @id @default(autoincrement())
+  runId          String
+  sourceRecordId String
+  payloadHash    String
+  payload        Json
+  ingestedAt     DateTime  @default(now())
+  run            IngestRun @relation(fields: [runId], references: [runId], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([sourceRecordId])
+}
+
+model Candidate {
+  candidateId          String   @id
+  name                 String
+  office               String
+  officeState          String?
+  officeDistrict       String?
+  party                String?
+  incumbentChallenge   String?
+  candidateStatus      String?
+  electionYear         Int?
+  principalCommittees  Json
+  firstSeenRunId       String
+  lastSeenRunId        String
+  updatedAt            DateTime @updatedAt
+  memberCrosswalks     CandidateMemberCrosswalk[]
+}
+
+model Committee {
+  committeeId       String   @id
+  name              String
+  committeeType     String?
+  designation       String?
+  party             String?
+  treasurerName     String?
+  filingFrequency   String?
+  orgType           String?
+  connectedOrgName  String?
+  linkedCandidateId String?
+  firstSeenRunId    String
+  lastSeenRunId     String
+  updatedAt         DateTime @updatedAt
+}
+
+model Bill {
+  billId            String   @id
+  congress          Int
+  billType          String
+  billNumber        String
+  title             String
+  latestActionDate  String?
+  latestActionText  String?
+  policyArea        String?
+  sponsor           String?
+  sponsorParty      String?
+  sponsorState      String?
+  firstSeenRunId    String
+  lastSeenRunId     String
+  updatedAt         DateTime @updatedAt
+
+  @@index([congress, billType, billNumber])
+}
+
+model CongressMember {
+  bioguideId        String                     @id
+  name              String
+  party             String?
+  partyCode         String?
+  state             String
+  stateName         String?
+  district          String?
+  chamber           String
+  termStartYear     Int?
+  updateDate        String?
+  currentMember     Boolean?
+  officialUrl       String?
+  directOrderName   String?
+  firstName         String?
+  lastName          String?
+  firstSeenRunId    String
+  lastSeenRunId     String
+  updatedAt         DateTime                   @updatedAt
+  memberships       CongressMembership[]
+  voteResults       HouseVoteMemberVote[]
+  senateVoteResults SenateVoteMemberVote[]
+  candidateMappings CandidateMemberCrosswalk[]
+
+  @@index([state])
+  @@index([chamber])
+}
+
+model CongressMembership {
+  id            BigInt        @id @default(autoincrement())
+  bioguideId    String
+  congress      Int
+  chamber       String
+  state         String
+  stateName     String?
+  district      String?
+  party         String?
+  partyCode     String?
+  memberType    String?
+  startYear     Int?
+  endYear       Int?
+  ingestedAt    DateTime      @default(now())
+  member        CongressMember @relation(fields: [bioguideId], references: [bioguideId], onDelete: Cascade)
+
+  @@unique([bioguideId, congress, chamber, state, district])
+  @@index([congress])
+  @@index([state, district])
+  @@index([bioguideId])
+}
+
+model CandidateMemberCrosswalk {
+  id          BigInt        @id @default(autoincrement())
+  candidateId String
+  bioguideId  String
+  matchType   String
+  confidence  Float
+  notes       String?
+  createdAt   DateTime      @default(now())
+  candidate   Candidate     @relation(fields: [candidateId], references: [candidateId], onDelete: Cascade)
+  member      CongressMember @relation(fields: [bioguideId], references: [bioguideId], onDelete: Cascade)
+
+  @@unique([candidateId, bioguideId])
+  @@index([candidateId])
+  @@index([bioguideId])
+}
+
+model HouseVote {
+  voteId            String               @id
+  identifier        String?
+  congress          Int
+  session           Int
+  rollCallNumber    Int
+  startDate         String?
+  updateDate        String?
+  voteType          String?
+  result            String?
+  legislationType   String?
+  legislationNumber String?
+  voteQuestion      String?
+  amendmentType     String?
+  amendmentNumber   String?
+  amendmentAuthor   String?
+  legislationUrl    String?
+  billId            String?
+  firstSeenRunId    String
+  lastSeenRunId     String
+  updatedAt         DateTime             @updatedAt
+  memberVotes       HouseVoteMemberVote[]
+
+  @@index([congress, session, rollCallNumber])
+  @@index([billId])
+}
+
+model HouseVoteMemberVote {
+  id         BigInt        @id @default(autoincrement())
+  voteId      String
+  bioguideId  String
+  voteCast    String
+  voteParty   String?
+  voteState   String?
+  firstName   String?
+  lastName    String?
+  createdAt   DateTime      @default(now())
+  vote        HouseVote      @relation(fields: [voteId], references: [voteId], onDelete: Cascade)
+  member      CongressMember @relation(fields: [bioguideId], references: [bioguideId], onDelete: Cascade)
+
+  @@unique([voteId, bioguideId])
+  @@index([voteId])
+  @@index([bioguideId])
+  @@index([voteCast])
+}
+
+model SenateVote {
+  voteId               String                 @id
+  congress             Int
+  session              Int
+  rollCallNumber       Int
+  voteDate             String?
+  modifyDate           String?
+  issue                String?
+  question             String?
+  voteQuestionText     String?
+  voteDocumentText     String?
+  voteTitle            String?
+  majorityRequirement  String?
+  result               String?
+  resultText           String?
+  billId               String?
+  documentType         String?
+  documentNumber       String?
+  firstSeenRunId       String
+  lastSeenRunId        String
+  updatedAt            DateTime               @updatedAt
+  memberVotes          SenateVoteMemberVote[]
+
+  @@index([congress, session, rollCallNumber])
+  @@index([billId])
+}
+
+model SenateVoteMemberVote {
+  id          BigInt        @id @default(autoincrement())
+  voteId       String
+  bioguideId   String
+  lisMemberId  String?
+  voteCast     String
+  voteParty    String?
+  voteState    String?
+  firstName    String?
+  lastName     String?
+  memberFull   String?
+  createdAt    DateTime      @default(now())
+  vote         SenateVote     @relation(fields: [voteId], references: [voteId], onDelete: Cascade)
+  member       CongressMember @relation(fields: [bioguideId], references: [bioguideId], onDelete: Cascade)
+
+  @@unique([voteId, bioguideId])
+  @@index([voteId])
+  @@index([bioguideId])
+  @@index([lisMemberId])
+  @@index([voteCast])
+}
+
+model StateOutcome {
+  stateOutcomeId          String   @id
+  stateCode               String
+  stateName               String
+  year                    Int
+  population              Int?
+  childPovertyPct         Float?
+  fertilityRatePer1kWomen Float?
+  suicideRatePer100k      Float?
+  childMortalityPer1k     Float?
+  sourceYears             Json
+  firstSeenRunId          String
+  lastSeenRunId           String
+  updatedAt               DateTime @updatedAt
+
+  @@unique([stateCode, year])
+  @@index([stateCode])
+  @@index([year])
+}
+
+model IndependentExpenditure {
+  id             BigInt   @id @default(autoincrement())
+  runId          String
+  cycle          Int
+  committeeId    String
+  committeeName  String?
+  candidateId    String?
+  candidateName  String?
+  amount         Float
+  date           String?
+  supportOppose  String?
+  purpose        String?
+  payee          String?
+  state          String?
+  district       String?
+  office         String?
+  ingestedAt     DateTime @default(now())
+
+  @@index([committeeId])
+  @@index([candidateId])
+  @@index([cycle])
+}
+
+model OperatingExpenditure {
+  id             BigInt   @id @default(autoincrement())
+  runId          String
+  cycle          Int
+  committeeId    String
+  amount         Float
+  date           String?
+  purpose        String?
+  payee          String?
+  city           String?
+  state          String?
+  zipCode        String?
+  categoryCode   String?
+  transactionId  String?
+  ingestedAt     DateTime @default(now())
+
+  @@index([committeeId])
+  @@index([cycle])
+}
+
+model CandidateCommitteeLink {
+  id                    BigInt   @id @default(autoincrement())
+  runId                 String
+  cycle                 Int
+  candidateId           String
+  candidateElectionYear Int
+  committeeId           String
+  committeeDesignation  String?
+  committeeType         String?
+  ingestedAt            DateTime @default(now())
+
+  @@unique([candidateId, committeeId, candidateElectionYear])
+  @@index([candidateId])
+  @@index([committeeId])
+}
+
+model CandidateFinancials {
+  id                          BigInt   @id @default(autoincrement())
+  runId                       String
+  cycle                       Int
+  candidateId                 String
+  name                        String
+  party                       String?
+  totalReceipts               Float?
+  totalDisbursements          Float?
+  cashOnHand                  Float?
+  totalIndividualContributions Float?
+  otherCommitteeContributions Float?
+  partyContributions          Float?
+  ingestedAt                  DateTime @default(now())
+
+  @@unique([candidateId, cycle])
+  @@index([candidateId])
+  @@index([cycle])
+}
+
+model PacSummary {
+  id                    BigInt   @id @default(autoincrement())
+  runId                 String
+  cycle                 Int
+  committeeId           String
+  name                  String
+  committeeType         String?
+  designation           String?
+  party                 String?
+  totalReceipts         Float?
+  totalDisbursements    Float?
+  cashOnHand            Float?
+  independentExpenditures Float?
+  ingestedAt            DateTime @default(now())
+
+  @@unique([committeeId, cycle])
+  @@index([committeeId])
+  @@index([cycle])
+}
+
+model LeadershipPacLink {
+  id            BigInt   @id @default(autoincrement())
+  runId         String
+  committeeId   String
+  candidateId   String
+  committeeName String?
+  ingestedAt    DateTime @default(now())
+
+  @@unique([committeeId, candidateId])
+  @@index([candidateId])
+}

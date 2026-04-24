@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+:root {
+  --background: #e9eef2;
+  --foreground: #111827;
+  --surface: #ffffff;
+  --surface-raised: #fdfefe;
+  --surface-soft: #e7edf4;
+  --surface-muted: #d6e0ea;
+  --line: #aebdca;
+  --line-strong: #617286;
+  --accent: #007c89;
+  --accent-strong: #005d66;
+  --accent-soft: #c9f0f3;
+  --civic: #14213d;
+  --civic-soft: #d8e0ec;
+  --danger: #b0122a;
+  --danger-soft: #f8d7da;
+  --warning: #b7791f;
+  --warning-soft: #ffe4a3;
+  --success: #0f7a4f;
+  --success-soft: #d9f0df;
+  --source: #174ea6;
+  --shadow-card: 0 1px 2px rgba(17, 24, 39, 0.10), 0 16px 36px rgba(17, 24, 39, 0.08);
+  --shadow-lift: 0 24px 54px rgba(17, 24, 39, 0.16);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --font-sans: var(--font-space-grotesk);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #f4f7fa;
+    --foreground: #17202a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  background-image:
+    linear-gradient(rgba(20, 33, 61, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 33, 61, 0.07) 1px, transparent 1px),
+    linear-gradient(180deg, #f8fafc 0%, #dfe7ee 100%);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+  font-family: var(--font-space-grotesk), Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: rgba(23, 107, 135, 0.20);
+}
+
+a,
+button,
+input,
+select {
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+@layer components {
+  .pt-shell {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border-color: var(--line);
+    color: var(--foreground);
+  }
+
+  .pt-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .pt-panel {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-raised) 92%, var(--surface-soft));
+  }
+
+  .pt-section {
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+  }
+
+  .pt-kicker {
+    color: var(--accent-strong);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+  }
+
+  .pt-title {
+    color: var(--foreground);
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .pt-muted {
+    color: #526071;
+  }
+
+  .pt-link {
+    color: var(--source);
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+  }
+
+  .pt-button-primary {
+    border: 1px solid var(--civic);
+    border-radius: 6px;
+    background: var(--civic);
+    color: white;
+    font-weight: 700;
+  }
+
+  .pt-button-primary:hover {
+    background: #172943;
+    border-color: #172943;
+  }
+
+  .pt-button-secondary {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--foreground);
+    font-weight: 700;
+  }
+
+  .pt-button-secondary:hover {
+    border-color: var(--line-strong);
+    background: var(--surface-soft);
+  }
+
+  .pt-input {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--foreground);
+    outline: none;
+  }
+
+  .pt-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+
+  .pt-table {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+
+  .pt-table-head {
+    background: var(--surface-soft);
+    color: #344255;
+  }
+
+  .pt-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface-soft);
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+}

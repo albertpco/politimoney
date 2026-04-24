@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "politimoney": {
+      "command": "npx",
+      "args": ["tsx", "src/scripts/mcp-server.ts"],
+      "env": {}
+    }
+  }
+}

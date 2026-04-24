@@ -102,11 +102,10 @@ cp .env.example .env.local
 #   CONGRESS_API_KEY — https://api.congress.gov/sign-up/
 
 # Pull the data
-npm run parse:bulk        # Parse FEC bulk files → JSON (~5 min)
-npm run fetch:votes       # Fetch congressional roll calls (~10 min)
-npm run fetch:financials  # Fetch candidate financials
-npm run fetch:lobbying    # Fetch lobbying disclosures
-npm run fetch:efilings    # Fetch real-time FEC eFilings
+npm run ingest            # Fetch and normalize public source data
+
+# Optional: parse locally cached FEC bulk ZIP files from data/ingest/bulk-cache
+npm run parse:bulk
 
 # Browse it
 npm run dev               # http://localhost:3000
@@ -257,7 +256,7 @@ npm run dev               # Next.js dev server
 npm run build             # Production build
 npm run cf:dev            # Static Cloudflare shell dev server
 npm run cf:build          # Build static Cloudflare shell
-npm run cf:build:beta     # Build shell with curated Pages beta feed
+npm run cf:build:beta     # Experimental: build shell with curated Pages beta feed
 npm run cf:check          # Export feed and build static shell
 npm run lint              # ESLint
 
@@ -286,7 +285,7 @@ npm run db:studio         # Prisma studio
 
 1. Fork and clone
 2. `cp .env.example .env.local` and add your API keys
-3. `npm install && npm run parse:bulk`
+3. `npm install && npm run ingest`
 4. `npm run dev` to verify things work
 5. Open a PR
 

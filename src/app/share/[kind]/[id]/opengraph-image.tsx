@@ -33,7 +33,7 @@ export default async function OpenGraphImage({ params }: ShareCardImageProps) {
             fontWeight: 700,
           }}
         >
-          Politired
+          PolitiMoney
         </div>
       ),
       size,
@@ -97,7 +97,7 @@ export default async function OpenGraphImage({ params }: ShareCardImageProps) {
                   color: "rgb(87,83,78)",
                 }}
               >
-                Politired
+                PolitiMoney
               </div>
             </div>
 

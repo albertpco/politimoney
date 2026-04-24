@@ -36,7 +36,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!checkAuth(req)) return unauthorized();
 
   const server = new McpServer({
-    name: "politired",
+    name: "politimoney",
     version: "0.1.0",
   });
 

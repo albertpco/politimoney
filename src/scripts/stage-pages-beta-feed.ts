@@ -42,10 +42,38 @@ async function writeJson(filePath: string, payload: unknown) {
 }
 
 async function copyFeedFile(relativePath: string) {
-  const source = path.join(SOURCE_DIR, relativePath);
-  const target = path.join(TARGET_DIR, relativePath);
+  if (path.isAbsolute(relativePath) || relativePath.split(path.sep).includes("..") || relativePath.includes("../")) {
+    throw new Error(`Unsafe feed path: ${relativePath}`);
+  }
+  const source = path.resolve(SOURCE_DIR, relativePath);
+  const target = path.resolve(TARGET_DIR, relativePath);
+  if (!source.startsWith(`${SOURCE_DIR}${path.sep}`) || !target.startsWith(`${TARGET_DIR}${path.sep}`)) {
+    throw new Error(`Feed path escapes staging directories: ${relativePath}`);
+  }
   await mkdir(path.dirname(target), { recursive: true });
   await cp(source, target);
+}
+
+function validateIndex(section: string, entries: FeedEntry[]) {
+  const ids = new Set<string>();
+  const hrefs = new Set<string>();
+  const datasetPaths = new Set<string>();
+
+  for (const entry of entries) {
+    if (!entry.id.trim() || !entry.href.trim() || !entry.datasetPath.trim()) {
+      throw new Error(`${section} contains a blank id, href, or datasetPath`);
+    }
+    for (const [label, value, seen] of [
+      ["id", entry.id.toLowerCase(), ids],
+      ["href", entry.href.toLowerCase(), hrefs],
+      ["datasetPath", entry.datasetPath, datasetPaths],
+    ] as const) {
+      if (seen.has(value)) {
+        throw new Error(`${section} contains duplicate ${label}: ${value}`);
+      }
+      seen.add(value);
+    }
+  }
 }
 
 async function main() {
@@ -71,7 +99,9 @@ async function main() {
     if (!dataset) continue;
 
     const entries = await readJson<FeedEntry[]>(path.join(SOURCE_DIR, dataset.path));
+    validateIndex(section, entries);
     const stagedEntries = entries.slice(0, BETA_LIMIT);
+    validateIndex(section, stagedEntries);
     await writeJson(path.join(TARGET_DIR, dataset.path), stagedEntries);
 
     stagedManifest.datasets[section] = {

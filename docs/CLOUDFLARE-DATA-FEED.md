@@ -104,7 +104,7 @@ dist/cloudflare
 If the feed is mounted on a separate R2 custom domain, set:
 
 ```text
-VITE_POLITIRED_FEED_BASE_URL=https://your-feed-domain/latest
+VITE_POLITIMONEY_FEED_BASE_URL=https://your-feed-domain/latest
 ```
 
 For local development, Vite serves `dist/public-feed/latest` at `/data/latest`
@@ -115,6 +115,9 @@ For a first beta without R2, build a curated Pages feed:
 ```bash
 npm run cf:build:beta
 ```
+
+`cf:build:beta` is intentionally partial: it stages a curated Pages feed for
+the public beta and should not be treated as the complete export.
 
 This copies a bounded subset of the generated feed into
 `dist/cloudflare/data/latest`. It is useful for getting online quickly, but the

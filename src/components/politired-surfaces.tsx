@@ -36,7 +36,7 @@ export function QueryHero({
             type="submit"
             className="rounded-md bg-white px-5 py-3 text-sm font-black text-[var(--civic)] hover:bg-[var(--accent-soft)]"
           >
-            Ask Politired
+            Ask PolitiMoney
           </button>
         </form>
         <div className="flex flex-wrap gap-2">
@@ -268,7 +268,7 @@ export function AiHandoffPanel({
       <p className="pt-kicker">Bring Your Own LLM</p>
       <h3 className="pt-title mt-2 text-lg">Chat with ChatGPT, Claude, or Gemini</h3>
       <p className="pt-muted mt-2 text-sm leading-6">
-        Use Politired as the evidence layer, then ask another model to reason over the public-record question.
+        Use PolitiMoney as the evidence layer, then ask another model to reason over the public-record question.
       </p>
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         {links.map((link) => (

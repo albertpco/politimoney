@@ -34,13 +34,14 @@ Build output:
 dist/cloudflare
 ```
 
-Set `VITE_POLITIRED_FEED_BASE_URL` to the R2/custom-domain feed base when the
-feed is not mounted at `/data/latest`.
+Set `VITE_POLITIMONEY_FEED_BASE_URL` to the R2/custom-domain feed base when the
+feed is not mounted at `/data/latest`. The old `VITE_POLITIRED_FEED_BASE_URL`
+name is still accepted for compatibility.
 
 Example:
 
 ```bash
-VITE_POLITIRED_FEED_BASE_URL=https://data.example.com/latest npm run cf:build
+VITE_POLITIMONEY_FEED_BASE_URL=https://data.example.com/latest npm run cf:build
 ```
 
 ## Feed Contract

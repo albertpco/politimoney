@@ -126,6 +126,7 @@ nav a span {
 .toolbar,
 .result-row,
 .notice,
+.fact-card,
 .json-card {
   border: 1px solid var(--line);
   border-radius: 0.6rem;
@@ -295,8 +296,32 @@ nav a:hover,
 }
 
 .notice h2,
+.fact-card h2,
 .json-card h2 {
   margin: 0 0 0.5rem;
+}
+
+.fact-card {
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin: 0;
+}
+
+.fact-grid div {
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+
+.subtle-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 800;
 }
 
 .json-card {
@@ -381,5 +406,9 @@ footer a {
   .toolbar span,
   .row-meta {
     margin-top: 0.75rem;
+  }
+
+  .fact-grid {
+    grid-template-columns: 1fr;
   }
 }

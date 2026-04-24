@@ -7,7 +7,7 @@ loadEnvConfig(process.cwd());
 
 async function startServer() {
   const server = new McpServer({
-    name: "politired",
+    name: "politimoney",
     version: "0.1.0",
   });
 
@@ -16,7 +16,7 @@ async function startServer() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Politired MCP server connected over stdio.");
+  console.error("PolitiMoney MCP server connected over stdio.");
 }
 
 startServer().catch((error) => {

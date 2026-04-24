@@ -62,6 +62,15 @@ function memberName(member: { name?: string; firstName?: string; lastName?: stri
   return member.name ?? `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() ?? member.bioguideId;
 }
 
+function mergeDefined<T extends Record<string, unknown>>(target: T, source: T): T {
+  for (const [key, value] of Object.entries(source)) {
+    if (value !== undefined && value !== null) {
+      target[key as keyof T] = value as T[keyof T];
+    }
+  }
+  return target;
+}
+
 async function main() {
   const [
     summary,
@@ -245,7 +254,19 @@ async function main() {
     });
   }
 
-  const stateIndex: FeedEntry[] = states.map((state) => {
+  const stateByCode = new Map<string, (typeof states)[number]>();
+  for (const state of states) {
+    const existing = stateByCode.get(state.stateCode);
+    stateByCode.set(
+      state.stateCode,
+      existing ? mergeDefined({ ...existing }, state) : state,
+    );
+  }
+  const uniqueStates = [...stateByCode.values()].sort((left, right) =>
+    left.stateName.localeCompare(right.stateName),
+  );
+
+  const stateIndex: FeedEntry[] = uniqueStates.map((state) => {
     const id = safeSegment(state.stateCode);
     return {
       id: state.stateCode,
@@ -257,7 +278,7 @@ async function main() {
     };
   });
 
-  for (const state of states) {
+  for (const state of uniqueStates) {
     await writeJson(`states/${safeSegment(state.stateCode)}.json`, {
       entityType: "state",
       state,

@@ -29,8 +29,19 @@ type DetailPayload = {
   [key: string]: unknown;
 };
 
-const FEED_BASE = import.meta.env.VITE_POLITIRED_FEED_BASE_URL || "/data/latest";
+const FEED_BASE =
+  import.meta.env.VITE_POLITIMONEY_FEED_BASE_URL ||
+  import.meta.env.VITE_POLITIRED_FEED_BASE_URL ||
+  "/data/latest";
 const SECTIONS: DatasetKey[] = ["members", "pacs", "donors", "bills", "votes", "states"];
+const SECTION_META: Record<DatasetKey, { label: string; singular: string; search: string }> = {
+  members: { label: "Members", singular: "member", search: "Search by name, chamber, party, or state" },
+  pacs: { label: "PACs", singular: "PAC", search: "Search by committee, sponsor, or funding note" },
+  donors: { label: "Donors", singular: "donor", search: "Search by donor, amount, or source tag" },
+  bills: { label: "Bills", singular: "bill", search: "Search by bill number, title, or policy area" },
+  votes: { label: "Votes", singular: "vote", search: "Search by bill, roll call, chamber, or result" },
+  states: { label: "States", singular: "state", search: "Search by state name or code" },
+};
 
 function money(value?: number) {
   if (!Number.isFinite(value)) return "";
@@ -83,6 +94,17 @@ function aiLinks(prompt: string) {
   ];
 }
 
+function factRows(entry?: FeedEntry, detail?: DetailPayload) {
+  const rows = [
+    ["Record ID", entry?.id],
+    ["Entity type", detail?.entityType],
+    ["Feed path", entry?.datasetPath],
+    ["Amount", entry?.amount ? money(entry.amount) : undefined],
+    ["Tags", entry?.tags?.join(", ")],
+  ];
+  return rows.filter((row): row is [string, string] => typeof row[1] === "string" && row[1].length > 0);
+}
+
 function Header({ manifest }: { manifest?: FeedManifest }) {
   return (
     <header className="site-header">
@@ -96,7 +118,7 @@ function Header({ manifest }: { manifest?: FeedManifest }) {
       <nav aria-label="Primary navigation">
         {SECTIONS.map((section) => (
           <a key={section} href={`#/${section}`}>
-            {section}
+            {SECTION_META[section].label}
             {manifest ? <span>{manifest.datasets[section].count.toLocaleString()}</span> : null}
           </a>
         ))}
@@ -126,11 +148,11 @@ function Home({ manifest }: { manifest?: FeedManifest }) {
           <dl>
             <div>
               <dt>Generated</dt>
-              <dd>{manifest ? new Date(manifest.generatedAt).toLocaleString() : "Loading"}</dd>
+              <dd>{manifest ? new Date(manifest.generatedAt).toLocaleString() : "Loading manifest"}</dd>
             </div>
             <div>
               <dt>Run</dt>
-              <dd>{manifest?.runId ?? "local/static"}</dd>
+              <dd>{manifest?.runId ?? (manifest ? "static export" : "Loading manifest")}</dd>
             </div>
             <div>
               <dt>Contract</dt>
@@ -143,7 +165,7 @@ function Home({ manifest }: { manifest?: FeedManifest }) {
       <section className="grid">
         {SECTIONS.map((section) => (
           <a className="section-card" href={`#/${section}`} key={section}>
-            <span className="kicker">{section}</span>
+            <span className="kicker">{SECTION_META[section].label}</span>
             <strong>{manifest?.datasets[section].count.toLocaleString() ?? "—"} records</strong>
             <p>{manifest?.datasets[section].description ?? "Loading feed metadata."}</p>
           </a>
@@ -204,30 +226,40 @@ function Directory({
     const haystack = `${entry.label} ${entry.id} ${entry.summary ?? ""} ${entry.tags?.join(" ") ?? ""}`.toLowerCase();
     return haystack.includes(query.toLowerCase());
   });
+  const visible = filtered.slice(0, 200);
+  const sectionLabel = SECTION_META[section].label;
 
   return (
     <main className="stack">
       <section className="page-title">
         <p className="kicker">Dataset</p>
-        <h1>{section}</h1>
+        <h1>{sectionLabel}</h1>
         <p>{manifest?.datasets[section].description ?? "Loading index metadata."}</p>
       </section>
 
       <div className="toolbar">
         <input
-          aria-label={`Search ${section}`}
-          placeholder={`Search ${section}`}
+          aria-label={`Search ${sectionLabel}`}
+          placeholder={SECTION_META[section].search}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <span>{filtered.length.toLocaleString()} visible</span>
+        <span>
+          Showing {visible.length.toLocaleString()} of {filtered.length.toLocaleString()} matches
+        </span>
       </div>
 
       {state.error ? <p className="error">{state.error}</p> : null}
-      {state.loading ? <p className="notice">Loading {section} index…</p> : null}
+      {state.loading ? <p className="notice">Loading {sectionLabel} index...</p> : null}
+      {!state.loading && !state.error && filtered.length === 0 ? (
+        <p className="notice">No {SECTION_META[section].singular} records match this search in the beta subset.</p>
+      ) : null}
+      {filtered.length > visible.length ? (
+        <p className="notice">This beta page renders the first {visible.length.toLocaleString()} matches. Narrow the search or use the manifest for the full staged index.</p>
+      ) : null}
 
       <section className="result-list">
-        {filtered.slice(0, 200).map((entry) => (
+        {visible.map((entry) => (
           <a
             href={`#/${section}/${encodeURIComponent(entry.id.toLowerCase())}`}
             className="result-row"
@@ -248,7 +280,17 @@ function Directory({
   );
 }
 
-function Detail({ section, id, selected }: { section: DatasetKey; id: string; selected?: FeedEntry }) {
+function Detail({
+  section,
+  id,
+  selected,
+  manifest,
+}: {
+  section: DatasetKey;
+  id: string;
+  selected?: FeedEntry;
+  manifest?: FeedManifest;
+}) {
   const [state, setState] = useState<{
     detail?: DetailPayload;
     entry?: FeedEntry;
@@ -261,7 +303,8 @@ function Detail({ section, id, selected }: { section: DatasetKey; id: string; se
     const load = async () => {
       let resolved = selected;
       if (!resolved || resolved.id.toLowerCase() !== id.toLowerCase()) {
-        const entries = await fetchJson<FeedEntry[]>(`indexes/${section}.json`);
+        const indexPath = manifest?.datasets[section].path ?? `indexes/${section}.json`;
+        const entries = await fetchJson<FeedEntry[]>(indexPath);
         resolved = entries.find((candidate) => candidate.id.toLowerCase() === id.toLowerCase());
       }
       if (!resolved) throw new Error(`No ${section} record found for ${id}`);
@@ -281,13 +324,14 @@ function Detail({ section, id, selected }: { section: DatasetKey; id: string; se
     return () => {
       cancelled = true;
     };
-  }, [id, section, selected]);
+  }, [id, manifest, section, selected]);
 
   const prompt = aiPrompt(state.entry, state.detail);
+  const rows = factRows(state.entry, state.detail);
 
   return (
     <main className="stack">
-      <a className="back-link" href={`#/${section}`}>← Back to {section}</a>
+      <a className="back-link" href={`#/${section}`}>Back to {SECTION_META[section].label}</a>
       <section className="page-title detail-title">
         <div>
           <p className="kicker">Record detail</p>
@@ -295,11 +339,15 @@ function Detail({ section, id, selected }: { section: DatasetKey; id: string; se
           <p>{state.entry?.summary ?? "Route-sized JSON detail from the public feed."}</p>
         </div>
         <div className="ai-links">
-          {aiLinks(prompt).map((link) => (
-            <a key={link.label} href={link.href} target="_blank" rel="noreferrer">
-              Ask {link.label}
-            </a>
-          ))}
+          {state.entry && state.detail ? (
+            aiLinks(prompt).map((link) => (
+              <a key={link.label} href={link.href} target="_blank" rel="noreferrer">
+                Ask {link.label}
+              </a>
+            ))
+          ) : (
+            <span className="subtle-note">AI links appear after the record loads.</span>
+          )}
         </div>
       </section>
 
@@ -312,6 +360,20 @@ function Detail({ section, id, selected }: { section: DatasetKey; id: string; se
           <p key={caveat}>{caveat}</p>
         ))}
       </section>
+
+      {rows.length > 0 ? (
+        <section className="fact-card">
+          <h2>Record Facts</h2>
+          <dl className="fact-grid">
+            {rows.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
 
       <section className="json-card">
         <div>
@@ -343,7 +405,7 @@ function App() {
       {!route.section ? (
         <Home manifest={manifest} />
       ) : route.id ? (
-        <Detail section={route.section} id={route.id} selected={selected} />
+        <Detail section={route.section} id={route.id} selected={selected} manifest={manifest} />
       ) : (
         <Directory section={route.section} manifest={manifest} onSelect={setSelected} />
       )}

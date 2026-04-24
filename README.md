@@ -4,6 +4,90 @@ Open-source public-record intelligence for American government. Pulls campaign f
 
 **The core idea:** clone this repo, add two free API keys, run the pipeline, and ask Claude, Codex, ChatGPT, or your own LLM questions like "Rank all PACs by total receipts" or "How did funding align with the vote on the latest defense bill?" backed by real FEC filings and congressional records.
 
+## For AI agents (drop-in)
+
+Any LLM client that speaks MCP can query this dataset. After `npm install` and one pipeline run (see Quick start below), point your client at `npm run mcp:server` and you get 27 stdio tools over local JSON — no database, no network calls at query time.
+
+**System-prompt blurb** — paste this into your model/agent so it uses the tools well:
+
+> You have MCP access to PolitiMoney, a local dataset of US campaign finance, congressional votes, lobbying, federal contracts, and SEC insider trades built from public records (FEC, Congress.gov, FARA, USASpending, SEC, LDA, Census/CDC). Prefer `get_pac_rankings`, `rank_entities`, and `analyze_vote_funding` over free-text search — they return complete ranked lists. Call `get_latest_ingest_summary` first if you need to know what cycle/date the data covers. Data is objective and ranked: when a user asks "is X the biggest?", show the full ranking, not just X. Every number comes from a linkable public filing; never assert motive, loyalty, or causality beyond what the records show.
+
+**Client configs:**
+
+<details><summary>Claude Desktop — <code>claude_desktop_config.json</code></summary>
+
+```json
+{
+  "mcpServers": {
+    "politimoney": {
+      "command": "npm",
+      "args": ["run", "mcp:server"],
+      "cwd": "/absolute/path/to/politimoney"
+    }
+  }
+}
+```
+</details>
+
+<details><summary>Claude Code — <code>.mcp.json</code> in the repo root (or <code>~/.claude.json</code>)</summary>
+
+```json
+{
+  "mcpServers": {
+    "politimoney": {
+      "type": "stdio",
+      "command": "npm",
+      "args": ["run", "mcp:server"]
+    }
+  }
+}
+```
+</details>
+
+<details><summary>Cursor — <code>.cursor/mcp.json</code></summary>
+
+```json
+{
+  "mcpServers": {
+    "politimoney": {
+      "command": "npm",
+      "args": ["run", "mcp:server"],
+      "cwd": "/absolute/path/to/politimoney"
+    }
+  }
+}
+```
+</details>
+
+<details><summary>Codex CLI / generic MCP stdio client</summary>
+
+```bash
+# Any MCP-compatible client can spawn this directly:
+cd /absolute/path/to/politimoney && npm run mcp:server
+```
+</details>
+
+<details><summary>ChatGPT / non-MCP models — JSON feed fallback</summary>
+
+```bash
+npm run feed:export     # → dist/public-feed/latest/*.json
+```
+
+Upload the feed directory (or host on R2/S3) and point your tool/function-calling schema at the JSON files directly.
+</details>
+
+**Good first questions to verify it's working:**
+- "What cycle is loaded? Call `get_latest_ingest_summary`."
+- "Rank the top 10 PACs by independent expenditures." → `get_pac_rankings`
+- "Show the funding split on the latest House defense vote." → `analyze_vote_funding`
+
+**Known gotchas:**
+- `search_entities` uses simple tokenization over ~600 indexed bills — for bills, prefer fetching by ID (`119-HR-1`) via `analyze_vote_funding` or `get_bills_lobbied`.
+- `rank_entities` currently only supports `metric: "total_receipts"`.
+- 2026 cycle is partial (FEC API pagination); 2024 is the complete bulk dataset.
+
+---
+
 ## Quick start
 
 ```bash
@@ -173,6 +257,7 @@ npm run dev               # Next.js dev server
 npm run build             # Production build
 npm run cf:dev            # Static Cloudflare shell dev server
 npm run cf:build          # Build static Cloudflare shell
+npm run cf:build:beta     # Build shell with curated Pages beta feed
 npm run cf:check          # Export feed and build static shell
 npm run lint              # ESLint
 

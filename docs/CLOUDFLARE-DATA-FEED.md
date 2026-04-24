@@ -110,6 +110,16 @@ VITE_POLITIRED_FEED_BASE_URL=https://your-feed-domain/latest
 For local development, Vite serves `dist/public-feed/latest` at `/data/latest`
 without copying the full feed into the deploy output.
 
+For a first beta without R2, build a curated Pages feed:
+
+```bash
+npm run cf:build:beta
+```
+
+This copies a bounded subset of the generated feed into
+`dist/cloudflare/data/latest`. It is useful for getting online quickly, but the
+full generated feed should move to R2 once the public data surface grows.
+
 ## Claim Boundary
 
 Every published feed should preserve these caveats:

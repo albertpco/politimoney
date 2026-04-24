@@ -1,0 +1,59 @@
+name: Refresh Cloudflare beta feed
+
+on:
+  workflow_dispatch:
+    inputs:
+      beta_feed_limit:
+        description: "Max records per dataset staged into the Pages beta feed"
+        required: false
+        default: "200"
+  schedule:
+    # Weekly beta refresh: Sunday 08:17 UTC. Change to daily when the feed is stable.
+    - cron: "17 8 * * 0"
+
+concurrency:
+  group: cloudflare-beta-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Ingest, build, and deploy beta
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      FEC_API_KEY: ${{ secrets.FEC_API_KEY }}
+      CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+      POLITIMONEY_BETA_FEED_LIMIT: ${{ github.event.inputs.beta_feed_limit || '200' }}
+      NODE_OPTIONS: --max-old-space-size=8192
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate required source secrets
+        run: |
+          test -n "$FEC_API_KEY" || { echo "Missing FEC_API_KEY secret"; exit 1; }
+          test -n "$CONGRESS_API_KEY" || { echo "Missing CONGRESS_API_KEY secret"; exit 1; }
+
+      - name: Run ingestion pipeline
+        run: npm run ingest
+
+      - name: Build curated Cloudflare Pages feed
+        run: npm run cf:build:beta
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist/cloudflare --project-name politimoney --branch main

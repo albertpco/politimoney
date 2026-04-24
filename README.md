@@ -133,6 +133,24 @@ npm run cf:check
 The shell output is `dist/cloudflare`; the feed output is separate and should be
 published to R2 or another object store.
 
+## Hosted beta refresh
+
+The public beta can be refreshed by GitHub Actions with
+`.github/workflows/refresh-cloudflare-beta.yml`. It runs weekly by default and
+can also be started manually from the Actions tab.
+
+Required repository secrets:
+
+- `FEC_API_KEY`
+- `CONGRESS_API_KEY`
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+The workflow runs `npm run ingest`, builds the curated Pages beta feed with
+`npm run cf:build:beta`, and deploys `dist/cloudflare` to the `politimoney`
+Cloudflare Pages project. Change the cron to daily once the feed and page
+contracts settle.
+
 ## Browser surfaces
 
 This repo intentionally contains both browser surfaces for now:

@@ -123,6 +123,27 @@ This copies a bounded subset of the generated feed into
 `dist/cloudflare/data/latest`. It is useful for getting online quickly, but the
 full generated feed should move to R2 once the public data surface grows.
 
+## Scheduled Refresh
+
+The repo includes `.github/workflows/refresh-cloudflare-beta.yml` for the hosted
+beta. It is intentionally conservative:
+
+- weekly schedule by default
+- manual `workflow_dispatch` trigger
+- configurable `beta_feed_limit` input for manual runs
+- deploys the curated Pages feed directly to the `politimoney` Pages project
+
+Required GitHub repository secrets:
+
+- `FEC_API_KEY`
+- `CONGRESS_API_KEY`
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+Use a Cloudflare API token that can deploy Pages projects in the target account.
+When the full feed moves to R2, add an upload step before the Pages deploy and
+set `VITE_POLITIMONEY_FEED_BASE_URL` to the R2/custom-domain `latest` prefix.
+
 ## Claim Boundary
 
 Every published feed should preserve these caveats:

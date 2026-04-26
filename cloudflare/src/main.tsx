@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-type DatasetKey = "members" | "pacs" | "donors" | "bills" | "votes" | "states";
+type DatasetKey = "members" | "pacs" | "donors" | "bills" | "votes" | "states" | "congressTrades";
 
 type FeedManifest = {
   schemaVersion: number;
@@ -33,7 +33,7 @@ const FEED_BASE =
   import.meta.env.VITE_POLITIMONEY_FEED_BASE_URL ||
   import.meta.env.VITE_POLITIRED_FEED_BASE_URL ||
   "/data/latest";
-const SECTIONS: DatasetKey[] = ["members", "pacs", "donors", "bills", "votes", "states"];
+const SECTIONS: DatasetKey[] = ["members", "pacs", "donors", "bills", "votes", "states", "congressTrades"];
 const SECTION_META: Record<DatasetKey, { label: string; singular: string; search: string }> = {
   members: { label: "Members", singular: "member", search: "Search by name, chamber, party, or state" },
   pacs: { label: "PACs", singular: "PAC", search: "Search by committee, sponsor, or funding note" },
@@ -41,6 +41,7 @@ const SECTION_META: Record<DatasetKey, { label: string; singular: string; search
   bills: { label: "Bills", singular: "bill", search: "Search by bill number, title, or policy area" },
   votes: { label: "Votes", singular: "vote", search: "Search by bill, roll call, chamber, or result" },
   states: { label: "States", singular: "state", search: "Search by state name or code" },
+  congressTrades: { label: "Congress Trades", singular: "trade", search: "Search by member, ticker, asset, state, or transaction type" },
 };
 
 function money(value?: number) {

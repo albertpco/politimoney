@@ -301,8 +301,8 @@ async function main() {
   await writeJson("indexes/votes.json", voteIndex);
   await writeJson("indexes/states.json", stateIndex);
 
-  const congressTradeIndex: FeedEntry[] = congressTrades.map((trade) => {
-    const id = `${safeSegment(trade.docId)}-${stableShortId(JSON.stringify(trade))}`;
+  const congressTradeIndex: FeedEntry[] = congressTrades.map((trade, index) => {
+    const id = `${safeSegment(trade.docId)}-${index + 1}-${stableShortId(JSON.stringify(trade))}`;
     return {
       id,
       label: `${trade.memberName}: ${trade.transactionLabel} ${trade.ticker ?? trade.assetName}`,
@@ -313,8 +313,8 @@ async function main() {
     };
   });
 
-  for (const trade of congressTrades) {
-    const id = `${safeSegment(trade.docId)}-${stableShortId(JSON.stringify(trade))}`;
+  for (const [index, trade] of congressTrades.entries()) {
+    const id = `${safeSegment(trade.docId)}-${index + 1}-${stableShortId(JSON.stringify(trade))}`;
     await writeJson(`congress-trades/${id}.json`, {
       entityType: "congress-trade",
       trade,

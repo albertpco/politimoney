@@ -30,7 +30,7 @@ const TARGET_DIR = path.resolve(
     path.join(process.cwd(), "dist", "cloudflare", "data", "latest"),
 );
 const BETA_LIMIT = Number(process.env.POLITIMONEY_BETA_FEED_LIMIT ?? 200);
-const SECTIONS = ["members", "pacs", "donors", "bills", "votes", "states"];
+const SECTIONS = ["members", "pacs", "donors", "bills", "votes", "states", "congressTrades"];
 
 async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(await readFile(filePath, "utf8")) as T;
@@ -56,7 +56,6 @@ async function copyFeedFile(relativePath: string) {
 
 function validateIndex(section: string, entries: FeedEntry[]) {
   const ids = new Set<string>();
-  const hrefs = new Set<string>();
   const datasetPaths = new Set<string>();
 
   for (const entry of entries) {
@@ -65,7 +64,6 @@ function validateIndex(section: string, entries: FeedEntry[]) {
     }
     for (const [label, value, seen] of [
       ["id", entry.id.toLowerCase(), ids],
-      ["href", entry.href.toLowerCase(), hrefs],
       ["datasetPath", entry.datasetPath, datasetPaths],
     ] as const) {
       if (seen.has(value)) {

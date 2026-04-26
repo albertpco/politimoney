@@ -140,11 +140,12 @@ describe("Congressional delegation per state", () => {
     const reps = congressMembers.filter(
       (m) => m.state === code && m.chamber === "H",
     );
-    // Allow 1 vacancy (mid-session resignations, deaths, etc.)
+    // Allow multiple concurrent vacancies (mid-session resignations, deaths, etc.).
+    // Example: the House Clerk listed CA-01 and CA-14 vacant in April 2026.
     expect(
       reps.length,
-      `${code} has ${reps.length} reps (expected ${expectedSeats - 1}-${expectedSeats}): ${reps.map((r) => r.name).join(", ")}`,
-    ).toBeGreaterThanOrEqual(expectedSeats - 1);
+      `${code} has ${reps.length} reps (expected ${expectedSeats - 2}-${expectedSeats}): ${reps.map((r) => r.name).join(", ")}`,
+    ).toBeGreaterThanOrEqual(expectedSeats - 2);
     expect(reps.length).toBeLessThanOrEqual(expectedSeats);
   });
 });

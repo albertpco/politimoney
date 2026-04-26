@@ -146,10 +146,17 @@ Required repository secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-The workflow runs `npm run ingest`, builds the curated Pages beta feed with
-`npm run cf:build:beta`, and deploys `dist/cloudflare` to the `politimoney`
-Cloudflare Pages project. Change the cron to daily once the feed and page
-contracts settle.
+The workflow runs `npm run beta:refresh`, which ingests, validates source
+artifacts, builds the curated Pages beta feed, and validates the deployable feed
+before publishing `dist/cloudflare` to the `politimoney` Cloudflare Pages
+project. Change the cron to daily once the feed and page contracts settle.
+
+For a manual weekly refresh from this machine:
+
+```bash
+npm run beta:refresh
+wrangler pages deploy dist/cloudflare --project-name politimoney --branch main --commit-dirty=true
+```
 
 ## Browser surfaces
 

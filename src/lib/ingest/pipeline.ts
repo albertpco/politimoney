@@ -55,13 +55,19 @@ function sourceSuccess(records: number, warnings: string[]): SourceRunStatus {
   };
 }
 
+function appendAll<T>(target: T[], source: T[]) {
+  for (const item of source) {
+    target.push(item);
+  }
+}
+
 function mergeFecResult(
   target: IngestArtifacts["fec"],
   source: FecIngestResult,
 ) {
   mergeCandidates(target, source.candidates);
   mergeCommittees(target, source.committees);
-  target.contributions.push(...source.contributions);
+  appendAll(target.contributions, source.contributions);
 }
 
 function mergeCandidates(target: IngestArtifacts["fec"], candidates: FecCandidate[]) {
@@ -253,7 +259,7 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
         cycle,
         limit: 300,
       });
-      artifacts.congress.bills.push(...billResult.bills);
+      appendAll(artifacts.congress.bills, billResult.bills);
       congressWarnings.push(...billResult.warnings.map((w) => `[cycle=${cycle}] ${w}`));
       const detail = ensureCycleDetail(cycleDetails, cycle);
       detail.congressBills = billResult.bills.length;
@@ -273,8 +279,8 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
         apiKey: config.congressApiKey,
         cycle,
       });
-      artifacts.congress.houseVotes.push(...voteResult.houseVotes);
-      artifacts.congress.houseVoteMemberVotes.push(...voteResult.houseVoteMemberVotes);
+      appendAll(artifacts.congress.houseVotes, voteResult.houseVotes);
+      appendAll(artifacts.congress.houseVoteMemberVotes, voteResult.houseVoteMemberVotes);
       congressWarnings.push(...voteResult.warnings.map((w) => `[cycle=${cycle}] ${w}`));
       const detail = ensureCycleDetail(cycleDetails, cycle);
       detail.houseVotes = voteResult.houseVotes.length;
@@ -285,8 +291,10 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
         members: memberResult.members,
         memberships: memberResult.memberships,
       });
-      artifacts.congress.senateVotes?.push(...senateVoteResult.senateVotes);
-      artifacts.congress.senateVoteMemberVotes?.push(...senateVoteResult.senateVoteMemberVotes);
+      artifacts.congress.senateVotes ??= [];
+      artifacts.congress.senateVoteMemberVotes ??= [];
+      appendAll(artifacts.congress.senateVotes, senateVoteResult.senateVotes);
+      appendAll(artifacts.congress.senateVoteMemberVotes, senateVoteResult.senateVoteMemberVotes);
       congressWarnings.push(...senateVoteResult.warnings.map((w) => `[cycle=${cycle}] ${w}`));
       detail.senateVotes = senateVoteResult.senateVotes.length;
       detail.senateVoteMemberVotes = senateVoteResult.senateVoteMemberVotes.length;

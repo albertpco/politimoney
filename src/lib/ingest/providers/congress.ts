@@ -560,11 +560,13 @@ async function ingestCongressMembersInternal({
     });
   }
 
-  const members = [...byBioguideId.values()].sort((left, right) => {
-    if (left.state !== right.state) return left.state.localeCompare(right.state);
-    if (left.chamber !== right.chamber) return left.chamber.localeCompare(right.chamber);
-    return left.name.localeCompare(right.name);
-  });
+  const members = [...byBioguideId.values()]
+    .filter((member) => member.currentMember !== false)
+    .sort((left, right) => {
+      if (left.state !== right.state) return left.state.localeCompare(right.state);
+      if (left.chamber !== right.chamber) return left.chamber.localeCompare(right.chamber);
+      return left.name.localeCompare(right.name);
+    });
 
   if (!members.length) {
     warnings.push("No current Congress members returned from Congress API.");

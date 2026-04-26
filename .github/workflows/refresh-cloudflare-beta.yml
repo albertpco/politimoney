@@ -45,14 +45,8 @@ jobs:
           test -n "$FEC_API_KEY" || { echo "Missing FEC_API_KEY secret"; exit 1; }
           test -n "$CONGRESS_API_KEY" || { echo "Missing CONGRESS_API_KEY secret"; exit 1; }
 
-      - name: Run ingestion pipeline
-        run: npm run ingest
-
-      - name: Build curated Cloudflare Pages feed
-        run: npm run cf:build:beta
-
-      - name: Validate deployable beta feed
-        run: npm run feed:validate:beta
+      - name: Refresh and validate beta feed
+        run: npm run beta:refresh
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

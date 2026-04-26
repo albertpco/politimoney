@@ -131,6 +131,7 @@ beta. It is intentionally conservative:
 - weekly schedule by default
 - manual `workflow_dispatch` trigger
 - configurable `beta_feed_limit` input for manual runs
+- source-artifact validation after ingestion
 - feed validation before deploy so empty critical datasets do not overwrite the
   public beta
 - deploys the curated Pages feed directly to the `politimoney` Pages project
@@ -145,6 +146,13 @@ Required GitHub repository secrets:
 Use a Cloudflare API token that can deploy Pages projects in the target account.
 When the full feed moves to R2, add an upload step before the Pages deploy and
 set `VITE_POLITIMONEY_FEED_BASE_URL` to the R2/custom-domain `latest` prefix.
+
+For a manual refresh without R2:
+
+```bash
+npm run beta:refresh
+wrangler pages deploy dist/cloudflare --project-name politimoney --branch main --commit-dirty=true
+```
 
 ## Claim Boundary
 

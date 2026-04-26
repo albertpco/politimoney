@@ -131,7 +131,8 @@ async function paginateAll<TRaw, TMapped>(
 
   while (url && page < maxPages) {
     page++;
-    const pageResult = await fetchLdaPage<TRaw>(url, label, page);
+    const pageResult: { data?: LdaPaginatedResponse<TRaw>; warning?: string } =
+      await fetchLdaPage<TRaw>(url, label, page);
     if (pageResult.warning) warnings.push(pageResult.warning);
     if (!pageResult.data) break;
     const data = pageResult.data;

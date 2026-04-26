@@ -4,6 +4,7 @@ import type {
   CongressBill,
   CongressMember,
   CongressMembership,
+  CongressTrade,
   CongressTradeDisclosure,
   ContractorProfile,
   FecCandidate,
@@ -356,7 +357,11 @@ export async function readSenateVoteMemberVotes(): Promise<SenateRollCallMemberV
 }
 
 export async function readOutcomeStates(): Promise<OutcomeRow[]> {
-  return readJsonOptional(path.join(LATEST_DIR, "outcomes.states.json"), []);
+  // Always read fresh — outcomes JSON gets backfilled with new fields (GDP)
+  // outside the ingest pipeline; caching it would mask updates in dev.
+  const filePath = path.join(LATEST_DIR, "outcomes.states.json");
+  jsonReadCache.delete(filePath);
+  return readJsonOptional(filePath, []);
 }
 
 export async function readCandidateFinancials(): Promise<FecCandidateFinancials[]> {
@@ -438,11 +443,17 @@ export async function readCongressTradeDisclosures(): Promise<CongressTradeDiscl
   return readJsonOptional(path.join(LATEST_DIR, "congress.trade-disclosures.json"), []);
 }
 
+export async function readCongressTrades(): Promise<CongressTrade[]> {
+  return readJsonOptional(path.join(LATEST_DIR, "congress.trades.json"), []);
+}
+
 export async function saveCongressTradeDisclosures(
   disclosures: CongressTradeDisclosure[],
+  trades: CongressTrade[] = [],
 ): Promise<void> {
   await ensureDirs();
   await writeJson(path.join(LATEST_DIR, "congress.trade-disclosures.json"), disclosures);
+  await writeJson(path.join(LATEST_DIR, "congress.trades.json"), trades);
 }
 
 // --- LDA (Lobbying Disclosure) readers and writers ---

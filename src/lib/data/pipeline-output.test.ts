@@ -32,6 +32,7 @@ import {
   readSenateVoteMemberVotes,
   readOutcomeStates,
   readCongressTradeDisclosures,
+  readCongressTrades,
   readContracts,
   readTopContractors,
   readInsiderTrades,
@@ -586,6 +587,47 @@ describe("Congress trade disclosures schema", () => {
   it("docId is a string", () => {
     for (const record of data.slice(0, 20)) {
       expect(typeof record.docId).toBe("string");
+    }
+  });
+});
+
+// ─── Congress trade transactions schema ─────────────────────
+
+describe("Congress trade transactions schema", () => {
+  const skip = !hasFile("congress.trades.json");
+  let data: Awaited<ReturnType<typeof readCongressTrades>>;
+  beforeAll(async () => {
+    data = await readCongressTrades();
+  });
+
+  it.skipIf(skip)("memberName is a string", () => {
+    for (const record of data.slice(0, 20)) {
+      expect(typeof record.memberName).toBe("string");
+    }
+  });
+
+  it.skipIf(skip)("assetName is a string", () => {
+    for (const record of data.slice(0, 20)) {
+      expect(typeof record.assetName).toBe("string");
+    }
+  });
+
+  it.skipIf(skip)("transactionType is normalized", () => {
+    const allowed = new Set(["purchase", "sale", "exchange", "other"]);
+    for (const record of data.slice(0, 20)) {
+      expect(allowed.has(record.transactionType)).toBe(true);
+    }
+  });
+
+  it.skipIf(skip)("transactionDate is an ISO date string", () => {
+    for (const record of data.slice(0, 20)) {
+      expect(record.transactionDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
+
+  it.skipIf(skip)("documentUrl links to source PDF", () => {
+    for (const record of data.slice(0, 20)) {
+      expect(record.documentUrl).toContain("/ptr-pdfs/");
     }
   });
 });

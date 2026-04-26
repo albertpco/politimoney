@@ -29,3 +29,19 @@ export async function fetchText(url: string, init?: RequestInit): Promise<string
   }
   return response.text();
 }
+
+export async function fetchBytes(url: string, init?: RequestInit): Promise<Uint8Array> {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "application/pdf, application/octet-stream, */*",
+      ...(init?.headers ?? {}),
+    },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Request failed (${response.status}) for ${url}: ${body.slice(0, 200)}`);
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}

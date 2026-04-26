@@ -1,8 +1,10 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import {
   readCongressBills,
   readCongressMembers,
+  readCongressTrades,
   readFundingReadModels,
   readHouseVoteMemberVotes,
   readHouseVotes,
@@ -52,6 +54,10 @@ function safeSegment(value: string | number): string {
   return encodeURIComponent(String(value).trim().toLowerCase());
 }
 
+function stableShortId(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16);
+}
+
 async function writeJson(relativePath: string, payload: unknown) {
   const filePath = path.join(OUT_DIR, relativePath);
   await mkdir(path.dirname(filePath), { recursive: true });
@@ -83,6 +89,7 @@ async function main() {
     houseMemberVotes,
     senateMemberVotes,
     states,
+    congressTrades,
   ] = await Promise.all([
     readLatestSummary(),
     readFundingReadModels(),
@@ -94,6 +101,7 @@ async function main() {
     readHouseVoteMemberVotes(),
     readSenateVoteMemberVotes(),
     readOutcomeStates(),
+    readCongressTrades(),
   ]);
 
   await rm(OUT_DIR, { recursive: true, force: true });
@@ -293,6 +301,32 @@ async function main() {
   await writeJson("indexes/votes.json", voteIndex);
   await writeJson("indexes/states.json", stateIndex);
 
+  const congressTradeIndex: FeedEntry[] = congressTrades.map((trade) => {
+    const id = `${safeSegment(trade.docId)}-${stableShortId(JSON.stringify(trade))}`;
+    return {
+      id,
+      label: `${trade.memberName}: ${trade.transactionLabel} ${trade.ticker ?? trade.assetName}`,
+      href: trade.documentUrl,
+      datasetPath: `congress-trades/${id}.json`,
+      summary: `${trade.transactionDate} · ${trade.amountRange}`,
+      tags: [trade.chamber, trade.state, trade.transactionType, trade.ticker ?? ""].filter(Boolean),
+    };
+  });
+
+  for (const trade of congressTrades) {
+    const id = `${safeSegment(trade.docId)}-${stableShortId(JSON.stringify(trade))}`;
+    await writeJson(`congress-trades/${id}.json`, {
+      entityType: "congress-trade",
+      trade,
+      caveats: [
+        "Congressional trade records are self-reported STOCK Act disclosures parsed from original PDFs.",
+        "Amount values are reported ranges, not exact transaction values.",
+        "These records do not establish illegality, motive, or material nonpublic information.",
+      ],
+    });
+  }
+  await writeJson("indexes/congress-trades.json", congressTradeIndex);
+
   const manifest: FeedManifest = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
@@ -331,6 +365,11 @@ async function main() {
         path: "indexes/states.json",
         count: stateIndex.length,
         description: "State outcome metric index.",
+      },
+      congressTrades: {
+        path: "indexes/congress-trades.json",
+        count: congressTradeIndex.length,
+        description: "Parsed congressional STOCK Act transaction rows with source PDF links.",
       },
     },
     caveats: [

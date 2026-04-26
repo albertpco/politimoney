@@ -346,10 +346,33 @@ export type StateOutcome = {
   fertilityRatePer1kWomen?: number;
   suicideRatePer100k?: number;
   childMortalityPer1k?: number;
+  /** Nominal GDP in millions USD (BEA annual). */
+  gdpUsdMillions?: number;
+  /** Derived: gdpUsdMillions × 1e6 / population. */
+  gdpPerCapitaUsd?: number;
+  /** Real GDP year-over-year growth, percent. */
+  gdpGrowthPct?: number;
+  /** Median household income, USD (Census ACS S1903). */
+  medianHouseholdIncomeUsd?: number;
+  /** Median age in years (Census ACS S0101). */
+  medianAgeYears?: number;
+  /** Percent of pop. age 25+ with bachelor's degree or higher (Census S1501). */
+  bachelorsOrHigherPct?: number;
+  /** Annual unemployment rate, percent (BLS LAUS). */
+  unemploymentRatePct?: number;
+  /** State+local taxes paid as % of state net product (Tax Foundation). */
+  stateLocalTaxBurdenPct?: number;
+  /** Net federal $ per resident: positive = state receives more than pays. */
+  federalBalancePerCapitaUsd?: number;
   sourceYears: {
     census?: number;
     cdcSuicide?: number;
     cdcChildMortalityPeriodId?: number;
+    beaGdp?: number;
+    censusEconomy?: number;
+    blsUnemployment?: number;
+    taxFoundation?: number;
+    federalBalance?: number;
   };
 };
 
@@ -441,13 +464,26 @@ export type CongressTradeDisclosure = {
 
 export type CongressTrade = {
   memberName: string;
+  chamber: "H" | "S";
+  state: string;
+  district?: string;
   bioguideId?: string;
   ticker?: string;
   assetName: string;
-  transactionType: "purchase" | "sale" | "exchange";
+  assetType?: string;
+  owner?: string;
+  transactionType: "purchase" | "sale" | "exchange" | "other";
+  transactionLabel: string;
   amountRange: string;
   transactionDate: string;
+  notificationDate?: string;
   filingDate: string;
+  filingYear: number;
+  docId: string;
+  documentUrl: string;
+  filingStatus?: string;
+  capitalGainsOver200?: boolean;
+  source: "house-ptr-pdf" | "senate-efd";
 };
 
 // --- SEC EDGAR insider trading (Form 4) types ---
@@ -510,6 +546,8 @@ export type IngestArtifacts = {
     houseVoteMemberVotes: HouseRollCallMemberVote[];
     senateVotes?: SenateRollCallVote[];
     senateVoteMemberVotes?: SenateRollCallMemberVote[];
+    tradeDisclosures?: CongressTradeDisclosure[];
+    trades?: CongressTrade[];
   };
   outcomes: {
     states: StateOutcome[];

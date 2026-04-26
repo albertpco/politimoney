@@ -39,6 +39,7 @@ import {
   readLatestSummary,
   readPacSummaries,
   readCongressTradeDisclosures,
+  readCongressTrades,
   readPacToCandidate,
   readRecentEfilings,
 } from "@/lib/ingest/storage";
@@ -815,6 +816,51 @@ export function registerPolitiredTools(
         uniqueMembers: byMember.size,
         topFilers,
         disclosures: sorted,
+      });
+    },
+  );
+
+  server.registerTool(
+    "get_congress_trades",
+    {
+      description:
+        "Return parsed congressional STOCK Act transaction rows from House PTR PDFs. Filter by member, ticker, state, year, transaction type, or amount range.",
+      inputSchema: z.object({
+        memberName: z.string().optional().describe("Substring match on member name (case-insensitive)."),
+        ticker: z.string().optional().describe("Ticker symbol filter, when the PDF identifies one."),
+        state: z.string().min(2).max(2).optional().describe("Two-letter state code filter."),
+        year: z.number().int().optional().describe("Filter by filing year."),
+        transactionType: z.enum(["purchase", "sale", "exchange", "other"]).optional(),
+        limit: z.number().int().min(1).max(500).optional().describe("Max results. Default 100."),
+      }),
+    },
+    async ({ memberName, ticker, state, year, transactionType, limit = 100 }) => {
+      const trades = await readCongressTrades();
+      if (!trades.length) {
+        return asTextResult({
+          ok: false,
+          message: "No parsed congressional trade transactions available. Run the ingest pipeline first.",
+        });
+      }
+
+      let filtered = trades;
+      if (memberName) {
+        const q = memberName.toLowerCase();
+        filtered = filtered.filter((trade) => trade.memberName.toLowerCase().includes(q));
+      }
+      if (ticker) filtered = filtered.filter((trade) => trade.ticker?.toUpperCase() === ticker.toUpperCase());
+      if (state) filtered = filtered.filter((trade) => trade.state === state.toUpperCase());
+      if (year) filtered = filtered.filter((trade) => trade.filingYear === year);
+      if (transactionType) filtered = filtered.filter((trade) => trade.transactionType === transactionType);
+
+      const sorted = filtered
+        .sort((a, b) => (b.transactionDate ?? "").localeCompare(a.transactionDate ?? ""))
+        .slice(0, limit);
+
+      return asTextResult({
+        ok: true,
+        totalMatching: filtered.length,
+        trades: sorted,
       });
     },
   );

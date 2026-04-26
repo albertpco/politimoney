@@ -367,9 +367,11 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
       years: tradeYears,
       members: artifacts.congress.members,
     });
-    await saveCongressTradeDisclosures(tradeResult.disclosures);
+    await saveCongressTradeDisclosures(tradeResult.disclosures, tradeResult.trades);
     congressTradeWarnings.push(...tradeResult.warnings);
-    console.log(`[pipeline] Congress trades: ${tradeResult.disclosures.length} PTR disclosures`);
+    console.log(
+      `[pipeline] Congress trades: ${tradeResult.disclosures.length} PTR disclosures, ${tradeResult.trades.length} transactions`,
+    );
   } catch (error) {
     congressTradeWarnings.push(
       `congress-trades: ${error instanceof Error ? error.message : "unknown error"}`,

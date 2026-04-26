@@ -6,7 +6,7 @@ import type {
   ContractorProfile,
 } from "@/lib/ingest/types";
 
-const SEC_USER_AGENT = "politired/0.1 (political finance research)";
+const SEC_USER_AGENT = "politimoney/0.1 albpcohen@gmail.com";
 
 const SEC_HEADERS: Record<string, string> = {
   "User-Agent": SEC_USER_AGENT,
@@ -44,7 +44,9 @@ type EdgarSearchResponse = {
 async function searchCompanyByName(
   name: string,
 ): Promise<EdgarCompanyMatch | null> {
-  const url = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(name)}&dateRange=custom&startdt=2024-01-01&enddt=2025-12-31&forms=4`;
+  const endYear = new Date().getUTCFullYear();
+  const startYear = endYear - 1;
+  const url = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(name)}&dateRange=custom&startdt=${startYear}-01-01&enddt=${endYear}-12-31&forms=4`;
   try {
     const data = await fetchJson<EdgarSearchResponse>(url, {
       headers: SEC_HEADERS,
@@ -88,6 +90,24 @@ type Form4FilingRef = {
   filingDate: string;
   primaryDocument: string;
 };
+
+const DEFAULT_MARKET_CIKS: EdgarCompanyMatch[] = [
+  { ticker: "NVDA", cik: "1045810", companyName: "NVIDIA CORP" },
+  { ticker: "AAPL", cik: "320193", companyName: "APPLE INC" },
+  { ticker: "MSFT", cik: "789019", companyName: "MICROSOFT CORP" },
+  { ticker: "GOOGL", cik: "1652044", companyName: "ALPHABET INC" },
+  { ticker: "AMZN", cik: "1018724", companyName: "AMAZON COM INC" },
+  { ticker: "META", cik: "1326801", companyName: "META PLATFORMS INC" },
+  { ticker: "TSLA", cik: "1318605", companyName: "TESLA INC" },
+  { ticker: "PLTR", cik: "1321655", companyName: "PALANTIR TECHNOLOGIES INC" },
+  { ticker: "LMT", cik: "936468", companyName: "LOCKHEED MARTIN CORP" },
+  { ticker: "RTX", cik: "101829", companyName: "RTX CORP" },
+  { ticker: "NOC", cik: "1133421", companyName: "NORTHROP GRUMMAN CORP" },
+  { ticker: "GD", cik: "40533", companyName: "GENERAL DYNAMICS CORP" },
+  { ticker: "BA", cik: "12927", companyName: "BOEING CO" },
+  { ticker: "UNH", cik: "731766", companyName: "UNITEDHEALTH GROUP INC" },
+  { ticker: "LLY", cik: "59478", companyName: "ELI LILLY AND CO" },
+];
 
 async function fetchRecentForm4Refs(
   cik: string,
@@ -258,7 +278,8 @@ async function fetchForm4Trades(
     await delay();
     try {
       const accessionNoDashes = ref.accessionNumber.replace(/-/g, "");
-      const url = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNoDashes}/${ref.primaryDocument}`;
+      const primaryDocument = ref.primaryDocument.split("/").pop() ?? ref.primaryDocument;
+      const url = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNoDashes}/${primaryDocument}`;
       const xml = await fetchText(url, { headers: SEC_HEADERS });
       const parsed = parseForm4Xml(xml, ref.filingDate, cik);
 
@@ -411,7 +432,9 @@ async function fetchTopInsiderBuyers(
   const allTrades: InsiderTrade[] = [];
 
   // Search for recent Form 4 filings with purchase transactions
-  const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=%22transactionCode%22+%22P%22&forms=4&dateRange=custom&startdt=2025-01-01&enddt=2025-12-31`;
+  const endYear = new Date().getUTCFullYear();
+  const startYear = endYear - 1;
+  const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=%22transactionCode%22+%22P%22&forms=4&dateRange=custom&startdt=${startYear}-01-01&enddt=${endYear}-12-31`;
   let ciks: string[] = [];
 
   try {
@@ -497,7 +520,14 @@ export async function ingestSecInsiderData({
   );
 
   // Step 3: Fetch Form 4 filings for each matched company
-  for (const company of resolvedCompanies) {
+  const companyTargets = [...resolvedCompanies];
+  for (const company of DEFAULT_MARKET_CIKS) {
+    if (!companyTargets.some((target) => target.cik === company.cik)) {
+      companyTargets.push(company);
+    }
+  }
+
+  for (const company of companyTargets.slice(0, Math.max(maxCompanies, DEFAULT_MARKET_CIKS.length))) {
     await delay();
     const result = await fetchForm4Trades(company.cik, filingsPerCompany);
     allTrades.push(...result.trades);

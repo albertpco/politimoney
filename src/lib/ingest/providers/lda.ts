@@ -18,9 +18,16 @@ import type {
   LobbyingActivity,
 } from "@/lib/ingest/types";
 
-const LDA_BASE = "https://lda.senate.gov/api/v1";
+const LDA_BASE = "https://lda.gov/api/v1";
 const PAGE_SIZE = 25;
 const PAGE_DELAY_MS = 1500; // polite rate-limiting
+const DEFAULT_MAX_PAGES = Number(process.env.INGEST_LDA_MAX_PAGES ?? 20);
+const QUARTERLY_PERIODS = [
+  { period: "first_quarter", filingType: "Q1", label: "Q1" },
+  { period: "second_quarter", filingType: "Q2", label: "Q2" },
+  { period: "third_quarter", filingType: "Q3", label: "Q3" },
+  { period: "fourth_quarter", filingType: "Q4", label: "Q4" },
+];
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -114,7 +121,7 @@ function mapActivity(raw: LdaFilingActivity): LobbyingActivity {
 async function paginateAll<TRaw, TMapped>(
   baseUrl: string,
   mapFn: (row: TRaw) => TMapped,
-  maxPages = 500,
+  maxPages = DEFAULT_MAX_PAGES,
   label = "",
 ): Promise<{ results: TMapped[]; warnings: string[] }> {
   const warnings: string[] = [];
@@ -124,14 +131,10 @@ async function paginateAll<TRaw, TMapped>(
 
   while (url && page < maxPages) {
     page++;
-    let data: LdaPaginatedResponse<TRaw>;
-    try {
-      data = await fetchJson<LdaPaginatedResponse<TRaw>>(url);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "unknown error";
-      warnings.push(`LDA fetch failed on page ${page} of ${label}: ${msg}`);
-      break;
-    }
+    const pageResult = await fetchLdaPage<TRaw>(url, label, page);
+    if (pageResult.warning) warnings.push(pageResult.warning);
+    if (!pageResult.data) break;
+    const data = pageResult.data;
 
     for (const row of data.results) {
       results.push(mapFn(row));
@@ -149,11 +152,34 @@ async function paginateAll<TRaw, TMapped>(
   return { results, warnings };
 }
 
+async function fetchLdaPage<TRaw>(
+  url: string,
+  label: string,
+  page: number,
+): Promise<{ data?: LdaPaginatedResponse<TRaw>; warning?: string }> {
+  let lastMessage = "";
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return { data: await fetchJson<LdaPaginatedResponse<TRaw>>(url) };
+    } catch (error) {
+      lastMessage = error instanceof Error ? error.message : "unknown error";
+      const retrySeconds = Number(lastMessage.match(/Expected available in (\d+) seconds/)?.[1] ?? 0);
+      const waitMs = retrySeconds > 0 ? (retrySeconds + 1) * 1000 : PAGE_DELAY_MS * (attempt + 2);
+      if (!lastMessage.includes("(429)") || attempt === 3) break;
+      await sleep(waitMs);
+    }
+  }
+
+  return {
+    warning: `LDA fetch failed on page ${page} of ${label}: ${lastMessage}`,
+  };
+}
+
 // --- Public ingest functions ---
 
 export async function ingestLobbyingFilings({
   year = 2024,
-  periods = ["Q1", "Q2", "Q3", "Q4"],
+  periods = QUARTERLY_PERIODS.map((period) => period.label),
 }: {
   year?: number;
   periods?: string[];
@@ -161,9 +187,17 @@ export async function ingestLobbyingFilings({
   const allFilings: LobbyingFiling[] = [];
   const allWarnings: string[] = [];
 
-  for (const period of periods) {
-    const url = `${LDA_BASE}/filings/?filing_year=${year}&filing_period=${period}&filing_type=Q&page_size=${PAGE_SIZE}`;
-    console.log(`\nFetching LDA filings for ${year} ${period}...`);
+  for (const requestedPeriod of periods) {
+    const quarter =
+      QUARTERLY_PERIODS.find((period) => period.label === requestedPeriod) ??
+      QUARTERLY_PERIODS.find((period) => period.period === requestedPeriod);
+    if (!quarter) {
+      allWarnings.push(`Skipping unknown LDA filing period: ${requestedPeriod}`);
+      continue;
+    }
+
+    const url = `${LDA_BASE}/filings/?filing_year=${year}&filing_period=${quarter.period}&filing_type=${quarter.filingType}&page_size=${PAGE_SIZE}`;
+    console.log(`\nFetching LDA filings for ${year} ${quarter.label}...`);
 
     const { results, warnings } = await paginateAll<LdaFilingRow, LobbyingFiling>(
       url,
@@ -173,16 +207,16 @@ export async function ingestLobbyingFilings({
         income: parseAmount(row.income),
         expenses: parseAmount(row.expenses),
         filingYear: row.filing_year ?? year,
-        filingPeriod: row.filing_period_display ?? period,
+        filingPeriod: row.filing_period_display ?? quarter.label,
         lobbyingActivities: (row.lobbying_activities ?? []).map(mapActivity),
       }),
-      500,
-      `filings ${year} ${period}`,
+      DEFAULT_MAX_PAGES,
+      `filings ${year} ${quarter.label}`,
     );
 
     allFilings.push(...results);
     allWarnings.push(...warnings);
-    console.log(`  ${period}: ${results.length} filings`);
+    console.log(`  ${quarter.label}: ${results.length} filings`);
   }
 
   return { filings: allFilings, warnings: allWarnings };
@@ -206,7 +240,7 @@ export async function ingestLobbyistContributions({
       date: row.date ?? "",
       contributionType: row.contribution_type ?? "",
     }),
-    500,
+    DEFAULT_MAX_PAGES,
     `contributions ${year}`,
   );
 

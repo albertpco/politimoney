@@ -73,6 +73,54 @@ function xmlValue(xml: string, tag: string): string | undefined {
   return value || undefined;
 }
 
+function parseCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      values.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  values.push(current);
+  return values;
+}
+
+function parseRegistrantCsv(raw: string): FaraRegistrantRow[] {
+  const [headerLine, ...lines] = raw.split(/\r?\n/).filter(Boolean);
+  if (!headerLine) return [];
+
+  const headers = parseCsvLine(headerLine);
+  const indexOf = (name: string) => headers.findIndex((header) => header.trim() === name);
+  const registrationNumberIndex = indexOf("Registration Number");
+  const registrationDateIndex = indexOf("Registration Date");
+  const nameIndex = indexOf("Name");
+  const cityIndex = indexOf("City");
+  const stateIndex = indexOf("State");
+
+  return lines.map((line) => {
+    const values = parseCsvLine(line);
+    return {
+      Registration_Number: values[registrationNumberIndex],
+      Registration_Date: values[registrationDateIndex],
+      Name: values[nameIndex],
+      City: values[cityIndex],
+      State: values[stateIndex],
+    };
+  });
+}
+
 async function fetchActiveRegistrantRows(): Promise<FaraRegistrantRow[]> {
   try {
     const payload = await fetchJson<FaraRegistrantResponse>(
@@ -81,14 +129,19 @@ async function fetchActiveRegistrantRows(): Promise<FaraRegistrantRow[]> {
     );
     return payload.REGISTRANTS_ACTIVE?.ROW ?? [];
   } catch {
-    const xml = await fetchFaraText(`${FARA_BASE_URL}/Registrants/xml/Active`);
-    return xmlBlocks(xml, "ROW").map((row) => ({
-      Registration_Number: xmlValue(row, "Registration_Number"),
-      Name: xmlValue(row, "Name"),
-      City: xmlValue(row, "City"),
-      State: xmlValue(row, "State"),
-      Registration_Date: xmlValue(row, "Registration_Date"),
-    }));
+    try {
+      const xml = await fetchFaraText(`${FARA_BASE_URL}/Registrants/xml/Active`);
+      return xmlBlocks(xml, "ROW").map((row) => ({
+        Registration_Number: xmlValue(row, "Registration_Number"),
+        Name: xmlValue(row, "Name"),
+        City: xmlValue(row, "City"),
+        State: xmlValue(row, "State"),
+        Registration_Date: xmlValue(row, "Registration_Date"),
+      }));
+    } catch {
+      const csv = await fetchFaraText(`${FARA_BASE_URL}/Registrants/csv/Active`);
+      return parseRegistrantCsv(csv);
+    }
   }
 }
 

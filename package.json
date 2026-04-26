@@ -24,6 +24,7 @@
     "fetch:efilings": "tsx src/scripts/fetch-efilings.ts",
     "fetch:insider-trades": "tsx src/scripts/fetch-insider-trades.ts",
     "feed:export": "tsx src/scripts/export-public-feed.ts",
+    "feed:validate:beta": "tsx src/scripts/validate-public-feed.ts",
     "mcp:server": "tsx src/scripts/mcp-server.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

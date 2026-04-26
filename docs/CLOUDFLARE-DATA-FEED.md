@@ -131,6 +131,8 @@ beta. It is intentionally conservative:
 - weekly schedule by default
 - manual `workflow_dispatch` trigger
 - configurable `beta_feed_limit` input for manual runs
+- feed validation before deploy so empty critical datasets do not overwrite the
+  public beta
 - deploys the curated Pages feed directly to the `politimoney` Pages project
 
 Required GitHub repository secrets:

@@ -51,6 +51,9 @@ jobs:
       - name: Build curated Cloudflare Pages feed
         run: npm run cf:build:beta
 
+      - name: Validate deployable beta feed
+        run: npm run feed:validate:beta
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

@@ -9,7 +9,7 @@
     "cf:build": "vite build --config cloudflare/vite.config.ts",
     "cf:build:beta": "npm run feed:export && npm run cf:build && tsx src/scripts/stage-pages-beta-feed.ts",
     "cf:preview": "vite preview --config cloudflare/vite.config.ts",
-    "cf:check": "npm run feed:export && npm run cf:build",
+    "cf:check": "npm run cf:build:beta && npm run feed:validate:beta",
     "start": "next start",
     "lint": "eslint",
     "ingest": "NODE_OPTIONS='--max-old-space-size=8192' tsx src/scripts/ingest.ts",
@@ -44,10 +44,12 @@
     "pdfjs-dist": "^5.4.394",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-router-dom": "^7.14.2",
     "yauzl": "^3.2.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/vite": "^4.2.4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^20",

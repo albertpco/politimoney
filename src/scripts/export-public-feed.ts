@@ -2,18 +2,23 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import {
+  readCandidateFinancials,
   readCongressBills,
   readCongressMembers,
   readCongressTrades,
+  readFecCandidates,
+  readFecCommittees,
   readFundingReadModels,
   readHouseVoteMemberVotes,
   readHouseVotes,
   readLatestSummary,
   readOutcomeStates,
+  readPacSummaries,
   readSenateVoteMemberVotes,
   readSenateVotes,
   readVoteFundingSummaries,
 } from "@/lib/ingest/storage";
+import { buildCandidateMemberCrosswalk } from "@/lib/data/crosswalk";
 
 type FeedEntry = {
   id: string;
@@ -90,6 +95,10 @@ async function main() {
     senateMemberVotes,
     states,
     congressTrades,
+    candidates,
+    committees,
+    candidateFinancials,
+    pacSummaries,
   ] = await Promise.all([
     readLatestSummary(),
     readFundingReadModels(),
@@ -102,7 +111,138 @@ async function main() {
     readSenateVoteMemberVotes(),
     readOutcomeStates(),
     readCongressTrades(),
+    readFecCandidates(),
+    readFecCommittees(),
+    readCandidateFinancials(),
+    readPacSummaries(),
   ]);
+
+  // Build candidate→bioguide crosswalk so member detail JSON can carry a
+  // synthesized funding profile when no explicit member-typed read model exists.
+  // House crosswalk needs `officeDistrict`; older ingests left it blank, so
+  // fill it here from the candidate ID (e.g. `H2CA31125` → district 31).
+  const candidatesWithDistrict = candidates.map((c) => {
+    if (c.officeDistrict || c.office !== "H") return c;
+    if (c.candidateId.length < 6) return c;
+    const raw = c.candidateId.slice(4, 6);
+    if (!/^[0-9]{2}$/.test(raw)) return c;
+    const trimmed = raw.replace(/^0+/, "") || "0";
+    return { ...c, officeDistrict: trimmed };
+  });
+  const crosswalkRows = buildCandidateMemberCrosswalk(candidatesWithDistrict, members, committees);
+  const candidateByBioguide = new Map<string, string>();
+  for (const row of crosswalkRows) {
+    const key = row.bioguideId.toUpperCase();
+    if (!candidateByBioguide.has(key)) candidateByBioguide.set(key, row.candidateId);
+  }
+
+  function relaxedNameKey(name: string): string {
+    return name.toLowerCase().replace(/[^a-z]/g, "");
+  }
+  // Build last+first key per (state, chamber) bucket from candidates.
+  const candidateKeyIndex = new Map<string, string>();
+  for (const c of candidates) {
+    if ((c.office !== "H" && c.office !== "S") || !c.officeState) continue;
+    const [last = "", rest = ""] = c.name.split(",", 2);
+    const first = rest.trim().split(/\s+/)[0] ?? "";
+    if (!last || !first) continue;
+    const key = `${c.office}|${c.officeState.toUpperCase()}|${relaxedNameKey(last)}|${relaxedNameKey(first)}`;
+    if (!candidateKeyIndex.has(key)) candidateKeyIndex.set(key, c.candidateId);
+  }
+  for (const member of members) {
+    if (candidateByBioguide.has(member.bioguideId.toUpperCase())) continue;
+    if (!member.chamber || !member.state) continue;
+    const memberName = member.name;
+    const [last = "", rest = ""] = memberName.includes(",")
+      ? memberName.split(",", 2)
+      : ["", ""];
+    let first = "";
+    let lastName = last;
+    if (memberName.includes(",")) {
+      first = rest.trim().split(/\s+/)[0] ?? "";
+    } else {
+      const tokens = memberName.trim().split(/\s+/);
+      first = tokens[0] ?? "";
+      lastName = tokens[tokens.length - 1] ?? "";
+    }
+    if (!lastName || !first) continue;
+    const key = `${member.chamber}|${member.state.toUpperCase()}|${relaxedNameKey(lastName)}|${relaxedNameKey(first)}`;
+    const candidateId = candidateKeyIndex.get(key);
+    if (candidateId) candidateByBioguide.set(member.bioguideId.toUpperCase(), candidateId);
+  }
+  // A candidate may file multiple summary rows (per cycle / amendments). Keep
+  // the row with the highest totalReceipts so downstream code sees a single
+  // representative figure rather than a cycle-zero amendment.
+  const financialsByCandidate = new Map<string, (typeof candidateFinancials)[number]>();
+  for (const cf of candidateFinancials) {
+    const existing = financialsByCandidate.get(cf.candidateId);
+    if (!existing || (cf.totalReceipts ?? 0) > (existing.totalReceipts ?? 0)) {
+      financialsByCandidate.set(cf.candidateId, cf);
+    }
+  }
+  const candidateProfileById = new Map(
+    (funding?.profiles ?? [])
+      .filter((p) => p.entityType === "candidate")
+      .map((p) => [p.entityId.toUpperCase(), p]),
+  );
+
+  function memberFundingProfile(bioguideId: string, label: string): unknown | null {
+    const candidateId = candidateByBioguide.get(bioguideId.toUpperCase());
+    if (!candidateId) return null;
+    const candidateProfile = candidateProfileById.get(candidateId.toUpperCase());
+    const financials = financialsByCandidate.get(candidateId);
+    if (!candidateProfile && !financials) return null;
+
+    const totalReceipts =
+      (candidateProfile?.totalReceipts ?? 0) > 0
+        ? (candidateProfile?.totalReceipts as number)
+        : (financials?.totalReceipts ?? 0);
+    const totalIndividualContributions =
+      financials?.totalIndividualContributions ?? candidateProfile?.totalIndividualContributions ?? 0;
+    const otherCommitteeContributions =
+      financials?.otherCommitteeContributions ?? candidateProfile?.otherCommitteeContributions ?? 0;
+    const partyContributions =
+      financials?.partyContributions ?? candidateProfile?.partyContributions ?? 0;
+    const independentExpenditures = candidateProfile?.independentExpenditures ?? 0;
+
+    const sources = [
+      { label: "Individual contributions", amount: totalIndividualContributions },
+      { label: "Other committee contributions", amount: otherCommitteeContributions },
+      { label: "Party contributions", amount: partyContributions },
+      { label: "Independent expenditures", amount: independentExpenditures },
+    ];
+    const sourceTotal = sources.reduce((sum, s) => sum + (s.amount ?? 0), 0);
+    const sourceBreakdown = sources
+      .filter((s) => (s.amount ?? 0) > 0)
+      .map((s) => ({
+        label: s.label,
+        amount: s.amount,
+        share: sourceTotal > 0 ? (s.amount ?? 0) / sourceTotal : 0,
+      }));
+
+    return {
+      entityType: "member",
+      entityId: bioguideId,
+      label,
+      linkedBioguideId: bioguideId,
+      linkedCandidateId: candidateId,
+      committeeIds: candidateProfile?.committeeIds ?? [],
+      totalReceipts,
+      totalIndividualContributions,
+      otherCommitteeContributions,
+      partyContributions,
+      independentExpenditures,
+      totalDisbursements: financials?.totalDisbursements,
+      cashOnHand: financials?.cashOnHand,
+      uniqueDonors: candidateProfile?.uniqueDonors ?? 0,
+      contributionRows: candidateProfile?.contributionRows ?? 0,
+      topDonors: (candidateProfile?.topDonors ?? []).map((d: { donor?: string; total?: number }) => ({
+        name: d.donor ?? "",
+        amount: Number(d.total ?? 0),
+      })),
+      sourceBreakdown,
+    };
+  }
 
   await rm(OUT_DIR, { recursive: true, force: true });
   await mkdir(OUT_DIR, { recursive: true });
@@ -115,27 +255,40 @@ async function main() {
   const committeeProfiles = (funding?.profiles ?? []).filter(
     (profile) => profile.entityType === "committee",
   );
+  const committeeProfileById = new Map(
+    committeeProfiles.map((profile) => [profile.entityId.toUpperCase(), profile]),
+  );
+  const committeeById = new Map(
+    committees.map((committee) => [committee.committeeId.toUpperCase(), committee]),
+  );
+  const pacSummaryById = new Map(
+    pacSummaries.map((summary) => [summary.committeeId.toUpperCase(), summary]),
+  );
 
   const memberIndex: FeedEntry[] = members.map((member) => {
     const id = safeSegment(member.bioguideId);
     const profile = profileByMember.get(member.bioguideId.toLowerCase());
+    const synthesized = profile ? null : memberFundingProfile(member.bioguideId, memberName(member));
     return {
       id: member.bioguideId,
       label: memberName(member),
       href: `/members/${id}`,
       datasetPath: `members/${id}.json`,
       summary: `${member.partyCode ?? member.party ?? "Unknown"}-${member.state}`,
-      amount: profile?.totalReceipts,
+      amount: profile?.totalReceipts ?? (synthesized as { totalReceipts?: number } | null)?.totalReceipts,
       tags: [member.chamber, member.state, member.partyCode ?? member.party ?? ""].filter(Boolean),
     };
   });
 
   for (const member of members) {
     const id = safeSegment(member.bioguideId);
+    const explicitProfile = profileByMember.get(member.bioguideId.toLowerCase());
+    const fundingProfile =
+      explicitProfile ?? memberFundingProfile(member.bioguideId, memberName(member));
     await writeJson(`members/${id}.json`, {
       entityType: "member",
       member,
-      funding: profileByMember.get(member.bioguideId.toLowerCase()) ?? null,
+      funding: fundingProfile ?? null,
       recentVotes: [...houseMemberVotes, ...senateMemberVotes]
         .filter((vote) => vote.bioguideId.toLowerCase() === member.bioguideId.toLowerCase())
         .slice(0, 100),
@@ -146,7 +299,34 @@ async function main() {
     });
   }
 
-  const pacIndex: FeedEntry[] = committeeProfiles.map((profile) => {
+  const pacIds = [
+    ...new Set([
+      ...pacSummaries.map((summary) => summary.committeeId.toUpperCase()),
+      ...committees.map((committee) => committee.committeeId.toUpperCase()),
+      ...committeeProfiles.map((profile) => profile.entityId.toUpperCase()),
+    ]),
+  ];
+  const pacProfiles = pacIds.map((committeeId) => {
+    const profile = committeeProfileById.get(committeeId);
+    const summary = pacSummaryById.get(committeeId);
+    const committee = committeeById.get(committeeId);
+    return {
+      ...(profile ?? {}),
+      entityType: "committee",
+      entityId: committeeId,
+      label: profile?.label ?? summary?.name ?? committee?.name ?? committeeId,
+      committeeIds: profile?.committeeIds ?? [committeeId],
+      committeeType: summary?.committeeType ?? committee?.committeeType,
+      designation: summary?.designation ?? committee?.designation,
+      party: summary?.party ?? committee?.party,
+      totalReceipts: profile?.totalReceipts ?? summary?.totalReceipts ?? 0,
+      totalDisbursements: profile?.totalDisbursements ?? summary?.totalDisbursements ?? 0,
+      cashOnHand: profile?.cashOnHand ?? summary?.cashOnHand ?? 0,
+      independentExpenditures: profile?.independentExpenditures ?? summary?.independentExpenditures ?? 0,
+    };
+  });
+
+  const pacIndex: FeedEntry[] = pacProfiles.map((profile) => {
     const id = safeSegment(profile.entityId);
     return {
       id: profile.entityId,
@@ -158,7 +338,7 @@ async function main() {
     };
   });
 
-  for (const profile of committeeProfiles) {
+  for (const profile of pacProfiles) {
     const id = safeSegment(profile.entityId);
     await writeJson(`pacs/${id}.json`, {
       entityType: "committee",
@@ -306,7 +486,7 @@ async function main() {
     return {
       id,
       label: `${trade.memberName}: ${trade.transactionLabel} ${trade.ticker ?? trade.assetName}`,
-      href: trade.documentUrl,
+      href: `/congress-trades/${id}`,
       datasetPath: `congress-trades/${id}.json`,
       summary: `${trade.transactionDate} · ${trade.amountRange}`,
       tags: [trade.chamber, trade.state, trade.transactionType, trade.ticker ?? ""].filter(Boolean),

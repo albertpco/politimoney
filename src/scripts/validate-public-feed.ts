@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-type DatasetKey = "members" | "pacs" | "donors" | "bills" | "votes" | "states";
+type DatasetKey = "members" | "pacs" | "donors" | "bills" | "votes" | "states" | "congressTrades";
 
 type Manifest = {
   datasets: Record<DatasetKey, { path: string; count: number; description: string }>;
@@ -20,6 +20,7 @@ const MIN_COUNTS: Record<DatasetKey, number> = {
   bills: Number(process.env.POLITIMONEY_MIN_BILLS ?? 1),
   votes: Number(process.env.POLITIMONEY_MIN_VOTES ?? 1),
   states: Number(process.env.POLITIMONEY_MIN_STATES ?? 50),
+  congressTrades: Number(process.env.POLITIMONEY_MIN_CONGRESS_TRADES ?? 1),
 };
 
 async function readJson<T>(filePath: string): Promise<T> {

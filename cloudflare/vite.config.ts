@@ -1,8 +1,8 @@
-import { existsSync } from "node:fs";
-import { createReadStream } from "node:fs";
+import { existsSync, createReadStream } from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwind from "@tailwindcss/vite";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const feedRoot = path.join(repoRoot, "dist", "public-feed", "latest");
@@ -28,7 +28,12 @@ function localFeedPlugin(): Plugin {
 
 export default defineConfig({
   root: path.join(repoRoot, "cloudflare"),
-  plugins: [react(), localFeedPlugin()],
+  plugins: [react(), tailwind(), localFeedPlugin()],
+  resolve: {
+    alias: {
+      "@": path.join(repoRoot, "cloudflare", "src"),
+    },
+  },
   build: {
     outDir: path.join(repoRoot, "dist", "cloudflare"),
     emptyOutDir: true,

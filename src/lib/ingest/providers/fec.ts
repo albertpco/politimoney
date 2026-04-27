@@ -48,6 +48,22 @@ export type FecIngestResult = {
 const FEC_BASE_URL = "https://api.open.fec.gov/v1";
 const FEDERAL_OFFICES = ["S", "H"] as const;
 
+/**
+ * House FEC candidate IDs encode the district at chars 4–5 (e.g. `H2CA31125`
+ * → state CA, district 31). Senate IDs (`S6ID00146`) carry no district.
+ * The `/candidates/` endpoint does not return a district field, so we parse
+ * it out of the ID. This unblocks the strict candidate↔member crosswalk in
+ * `crosswalk.ts`, which requires `officeDistrict` for House matches.
+ */
+function districtFromCandidateId(candidateId: string, office: string): string | undefined {
+  if (office !== "H") return undefined;
+  if (candidateId.length < 6) return undefined;
+  const raw = candidateId.slice(4, 6);
+  if (!/^[0-9]{2}$/.test(raw)) return undefined;
+  const trimmed = raw.replace(/^0+/, "");
+  return trimmed === "" ? "0" : trimmed;
+}
+
 function buildFecUrl(
   path: string,
   params: Record<string, string | number | undefined>,
@@ -165,27 +181,33 @@ export async function ingestFecData({
   let candidateRows: FecCandidateApiRow[] = [];
   const candidateRowsById = new Map<string, FecCandidateApiRow>();
   const officeCandidateCounts: Partial<Record<(typeof FEDERAL_OFFICES)[number], number>> = {};
-  for (const office of FEDERAL_OFFICES) {
-    try {
-      const officeRows = await fetchRowsWithPagination<FecCandidateApiRow>({
-        endpoint: "/candidates/",
-        limit: candidateLimit,
-        sort: "name",
-        extraParams: { cycle, office },
-      });
-      officeCandidateCounts[office] = officeRows.length;
-      for (const row of officeRows) {
-        if (row.candidate_id) {
-          candidateRowsById.set(row.candidate_id, row);
+  // Pull the requested cycle plus the previous cycle. Sitting House members
+  // serve 2-year terms, so the most recent prior cycle (e.g. 2024) carries
+  // many incumbents who haven't yet filed for the upcoming cycle (e.g. 2026).
+  const candidateCycles = Array.from(new Set([cycle, cycle - 2])).filter((c) => c >= 2000);
+  for (const candidateCycle of candidateCycles) {
+    for (const office of FEDERAL_OFFICES) {
+      try {
+        const officeRows = await fetchRowsWithPagination<FecCandidateApiRow>({
+          endpoint: "/candidates/",
+          limit: candidateLimit,
+          sort: "name",
+          extraParams: { cycle: candidateCycle, office },
+        });
+        officeCandidateCounts[office] = (officeCandidateCounts[office] ?? 0) + officeRows.length;
+        for (const row of officeRows) {
+          if (row.candidate_id && !candidateRowsById.has(row.candidate_id)) {
+            candidateRowsById.set(row.candidate_id, row);
+          }
         }
+      } catch (error) {
+        const officeName = office === "S" ? "Senate" : "House";
+        warnings.push(
+          `FEC ${officeName} candidates pull failed (cycle ${candidateCycle}): ${
+            error instanceof Error ? error.message : "unknown error"
+          }`,
+        );
       }
-    } catch (error) {
-      const officeName = office === "S" ? "Senate" : "House";
-      warnings.push(
-        `FEC ${officeName} candidates pull failed: ${
-          error instanceof Error ? error.message : "unknown error"
-        }`,
-      );
     }
   }
   candidateRows = [...candidateRowsById.values()];
@@ -224,22 +246,41 @@ export async function ingestFecData({
     );
   }
 
-  let contributionRows: FecContributionApiRow[] = [];
-  try {
-    contributionRows = await fetchRowsWithPagination<FecContributionApiRow>({
-      endpoint: "/schedules/schedule_a/",
-      limit: contributionLimit,
-      sort: "-contribution_receipt_amount",
-      extraParams: { two_year_transaction_period: cycle },
-      pageDelayMs: contributionPageDelayMs,
-    });
-  } catch (error) {
-    warnings.push(
-      `FEC contributions pull failed: ${
-        error instanceof Error ? error.message : "unknown error"
-      }`,
-    );
+  // Two passes: top-by-amount captures mega-donors; recent-by-date captures
+  // breadth across thousands of unique donors. Sorting on a single axis biases
+  // the donor index toward a tiny set of repeat $1M+ contributors.
+  const contributionRowsById = new Map<string, FecContributionApiRow>();
+  const contributionRowKey = (row: FecContributionApiRow) =>
+    [
+      row.committee_id ?? "",
+      row.contributor_name ?? "",
+      row.contribution_receipt_date ?? "",
+      row.contribution_receipt_amount ?? "",
+      row.contributor_employer ?? "",
+      row.contributor_occupation ?? "",
+    ].join("|");
+  for (const sort of ["-contribution_receipt_amount", "-contribution_receipt_date"] as const) {
+    try {
+      const rows = await fetchRowsWithPagination<FecContributionApiRow>({
+        endpoint: "/schedules/schedule_a/",
+        limit: contributionLimit,
+        sort,
+        extraParams: { two_year_transaction_period: cycle },
+        pageDelayMs: contributionPageDelayMs,
+      });
+      for (const row of rows) {
+        const key = contributionRowKey(row);
+        if (!contributionRowsById.has(key)) contributionRowsById.set(key, row);
+      }
+    } catch (error) {
+      warnings.push(
+        `FEC contributions pull failed (sort=${sort}): ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
+      );
+    }
   }
+  const contributionRows: FecContributionApiRow[] = [...contributionRowsById.values()];
 
   const committees = committeeRows
     .filter((row): row is Required<Pick<FecCommitteeApiRow, "committee_id">> & FecCommitteeApiRow => Boolean(row.committee_id))
@@ -277,6 +318,7 @@ export async function ingestFecData({
         name: row.name ?? row.candidate_id,
         office: row.office ?? "Unknown",
         officeState: row.state,
+        officeDistrict: districtFromCandidateId(row.candidate_id, row.office ?? ""),
         party: row.party_full,
         incumbentChallenge: row.incumbent_challenge_full,
         principalCommittees,

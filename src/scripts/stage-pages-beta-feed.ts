@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 type FeedEntry = {
@@ -33,7 +33,16 @@ const INGEST_DIR = path.resolve(
   process.env.POLITIMONEY_INGEST_DIR ?? path.join(process.cwd(), "data", "ingest", "latest"),
 );
 const BETA_LIMIT = Number(process.env.POLITIMONEY_BETA_FEED_LIMIT ?? 200);
+const SECTION_LIMITS: Record<string, number | undefined> = {
+  members: Number.POSITIVE_INFINITY,
+  pacs: Number(process.env.POLITIMONEY_PAGES_PAC_LIMIT ?? 8000),
+  bills: Number.POSITIVE_INFINITY,
+  votes: Number.POSITIVE_INFINITY,
+  states: Number.POSITIVE_INFINITY,
+  congressTrades: Number(process.env.POLITIMONEY_PAGES_TRADE_LIMIT ?? 4500),
+};
 const SECTIONS = ["members", "pacs", "donors", "bills", "votes", "states", "congressTrades"];
+const PAGES_FILE_BUDGET = Number(process.env.POLITIMONEY_PAGES_FILE_BUDGET ?? 19000);
 
 /**
  * For sections like "votes" where one index multiplexes multiple sub-shards
@@ -130,6 +139,16 @@ async function copyFeedFile(relativePath: string) {
   await cp(source, target);
 }
 
+async function countFiles(dir: string): Promise<number> {
+  let count = 0;
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) count += await countFiles(fullPath);
+    else count++;
+  }
+  return count;
+}
+
 function validateIndex(section: string, entries: FeedEntry[]) {
   const ids = new Set<string>();
   const datasetPaths = new Set<string>();
@@ -157,10 +176,10 @@ async function main() {
     generatedAt: new Date().toISOString(),
     source: {
       ...manifest.source,
-      note: `${manifest.source.note} This Pages beta includes curated indexes and detail records; use the full feed/R2 path for complete exports.`,
+      note: `${manifest.source.note} This Pages build includes route-sized indexes and detail records. Raw bulk files are intentionally excluded.`,
     },
     caveats: [
-      "This is a curated Pages beta feed. It is intentionally smaller than the full generated feed.",
+      "This Pages build includes public route-sized records and excludes raw bulk contribution files.",
       ...manifest.caveats,
     ],
   };
@@ -175,14 +194,18 @@ async function main() {
     const entries = await readJson<FeedEntry[]>(path.join(SOURCE_DIR, dataset.path));
     validateIndex(section, entries);
     const ordered = await orderEntriesForBeta(section, entries);
-    const stagedEntries = ordered.slice(0, BETA_LIMIT);
+    const limit = SECTION_LIMITS[section] ?? BETA_LIMIT;
+    const stagedEntries = Number.isFinite(limit) ? ordered.slice(0, limit) : ordered;
     validateIndex(section, stagedEntries);
     await writeJson(path.join(TARGET_DIR, dataset.path), stagedEntries);
 
     stagedManifest.datasets[section] = {
       ...dataset,
       count: stagedEntries.length,
-      description: `${dataset.description} Curated beta subset of ${entries.length.toLocaleString()} generated records.`,
+      description:
+        stagedEntries.length === entries.length
+          ? `${dataset.description} Full generated ${section} set for the hosted site.`
+          : `${dataset.description} Hosted subset of ${entries.length.toLocaleString()} generated records, ordered by public relevance.`,
     };
 
     for (const entry of stagedEntries) {
@@ -268,7 +291,14 @@ async function main() {
     await writeJson(path.join(TARGET_DIR, "recent-receipts.json"), recent);
   }
 
-  console.log(`Staged Pages beta feed at ${TARGET_DIR}`);
+  const fileCount = await countFiles(path.resolve(process.cwd(), "dist", "cloudflare"));
+  if (fileCount > PAGES_FILE_BUDGET) {
+    throw new Error(
+      `Pages output contains ${fileCount.toLocaleString()} files, above the launch budget of ${PAGES_FILE_BUDGET.toLocaleString()}. Lower a section limit or move details to object storage.`,
+    );
+  }
+
+  console.log(`Staged Pages feed at ${TARGET_DIR}`);
 }
 
 main().catch((error) => {

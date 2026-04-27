@@ -39,6 +39,7 @@ yarn-error.log*
 
 # ingest data and bulk cache
 /data/
+/.tmp/
 
 # vercel
 .vercel

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Link from "../components/link";
-import { CaveatPanel, ProvenancePanel } from "../components/page-templates";
+import { ProvenancePanel } from "../components/page-templates";
 import {
   PageTitle,
   CoverageStatusBar,
@@ -67,20 +67,16 @@ export function CongressTradeDetailPage() {
         <PageTitle title={title} subtitle={subtitle} />
         <CoverageStatusBar freshness="Latest ingestion cycle" quality="medium" />
 
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-4">
           <ProvenancePanel
             title="Trade provenance"
             backend="static-feed"
             runId={undefined}
-            freshness="Latest staged STOCK Act disclosure read model"
+            freshness="Latest public STOCK Act disclosure snapshot"
             coverage="House and Senate STOCK Act periodic transaction reports parsed from public PDF filings."
             sourceSystems={["House Clerk PTR PDFs", "Senate eFD"]}
             notes="Amount values are reported ranges, not exact transaction values."
           />
-          <CaveatPanel title="Claim boundary">
-            <p>These are self-reported disclosures. They do not establish illegality, motive, or use of material nonpublic information.</p>
-            <p>Filing dates can lag transaction dates by weeks or months under STOCK Act windows.</p>
-          </CaveatPanel>
         </div>
 
         <SectionCard title="Trade details" subtitle="Fields parsed from the source filing.">

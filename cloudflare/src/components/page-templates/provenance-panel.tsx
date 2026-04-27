@@ -24,6 +24,11 @@ function renderLink(link: ProvenanceLink) {
   return <Link className="pt-link" href={link.href}>{link.label}</Link>;
 }
 
+function backendLabel(value: string) {
+  if (value === "static-feed") return "Public record snapshot";
+  return value;
+}
+
 export function ProvenancePanel({
   freshness,
   coverage,
@@ -67,9 +72,9 @@ export function ProvenancePanel({
           {backend ? (
             <div>
               <dt className="pt-kicker">
-                Backend
+                Data access
               </dt>
-              <dd className="mt-1">{backend}</dd>
+              <dd className="mt-1">{backendLabel(backend)}</dd>
             </div>
           ) : null}
           {runId ? (

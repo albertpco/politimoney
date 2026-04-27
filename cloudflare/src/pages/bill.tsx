@@ -8,6 +8,7 @@ import {
 } from "../components/page-templates";
 import { SectionCard, TableExplorer } from "../components/ui-primitives";
 import { loadBill, type BillDetail } from "../lib/feed";
+import { congressBillUrl } from "../lib/congress-links";
 
 function billLabel(billType: string, billNumber: string): string {
   return `${billType.toUpperCase()} ${billNumber}`;
@@ -55,6 +56,12 @@ export function BillDetailPage() {
   const houseVotes = linkedVotes.filter((v) => v.chamber === "H");
   const senateVotes = linkedVotes.filter((v) => v.chamber === "S");
   const status = bill.status ?? bill.latestActionText ?? "—";
+  const congressUrl = congressBillUrl({
+    congress: bill.congress,
+    billType: bill.billType,
+    billNumber: bill.billNumber,
+    billId: bill.id,
+  });
 
   return (
     <EntityDetailTemplate
@@ -64,7 +71,7 @@ export function BillDetailPage() {
       summary={
         <div className="space-y-2">
           <p className="text-sm leading-6 text-stone-700">
-            {bill.sponsor ? `Sponsored by ${bill.sponsor}.` : "No sponsor is listed in the current dataset."}
+            {bill.sponsor ? `Sponsored by ${bill.sponsor}.` : "No sponsor is listed in the public record snapshot."}
           </p>
           <dl className="grid gap-3 text-sm text-stone-700 md:grid-cols-2">
             <div>
@@ -100,12 +107,13 @@ export function BillDetailPage() {
             freshness="Latest bill snapshot"
             coverage="complete"
             backend="static-feed"
-            sourceSystems={["Congress", "static-feed"]}
-            notes="This route is backed by the staged bill read model and bill-linked roll-call votes."
+            sourceSystems={["Congress", "Public data snapshot"]}
+            sourceLinks={congressUrl ? [{ label: "Open on Congress.gov", href: congressUrl, external: true }] : undefined}
+            notes="This route shows the bill snapshot and linked roll-call votes when available."
           />
           <CaveatPanel title="What this does not prove">
             A bill page links sponsorship and vote context, but it does not by itself establish
-            motive, causality, or influence.
+            motive, cause and effect, or influence.
           </CaveatPanel>
         </div>
       }
@@ -127,7 +135,7 @@ export function BillDetailPage() {
                 ])}
               />
             ) : (
-              <p className="text-sm text-stone-600">No House vote linked to this bill in the current dataset.</p>
+              <p className="text-sm text-stone-600">No House vote is linked to this bill in the public record snapshot.</p>
             )}
           </div>
           <div className="space-y-3">
@@ -142,7 +150,7 @@ export function BillDetailPage() {
                 ])}
               />
             ) : (
-              <p className="text-sm text-stone-600">No Senate vote linked to this bill in the current dataset.</p>
+              <p className="text-sm text-stone-600">No Senate vote is linked to this bill in the public record snapshot.</p>
             )}
           </div>
         </div>
@@ -150,6 +158,16 @@ export function BillDetailPage() {
 
       <SectionCard title="Next step" subtitle="Jump back to the directory or search for another bill.">
         <div className="flex flex-wrap gap-3">
+          {congressUrl ? (
+            <a
+              href={congressUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="pt-button-primary px-4 py-2 text-sm"
+            >
+              Open on Congress.gov
+            </a>
+          ) : null}
           <Link
             href="/bills"
             className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-800 hover:bg-stone-50"

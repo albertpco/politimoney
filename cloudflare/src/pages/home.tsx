@@ -16,7 +16,7 @@ import {
   WorkflowCard,
 } from "../components/politired-surfaces";
 import { RecentReceiptsTicker } from "../components/recent-receipts-ticker";
-import { fetchJson, loadLaunchSummary, type LaunchSummary } from "../lib/feed";
+import { fetchJson, loadLaunchSummary, loadManifest, type FeedManifest, type LaunchSummary } from "../lib/feed";
 import {
   getStateDashboardRowsFromOutcomes,
   type OutcomeRow,
@@ -55,8 +55,8 @@ function formatMoney(value: number | undefined): string {
 
 function buildLlmHandoffPrompt(): string {
   return [
-    "I am using Politired, an open public-record intelligence tool for American government.",
-    "Help me inspect the evidence without assuming motive or causality.",
+    "I am using PolitiMoney, an open public-record intelligence tool for American government.",
+    "Help me inspect the evidence without assuming motive or cause and effect.",
     "Start with these questions:",
     "1. Who funds the official, committee, bill, or vote group I am looking at?",
     "2. Which records support the claim, and what source links should I verify?",
@@ -83,18 +83,21 @@ const STATE_MAP_METRICS = [
 
 export function HomePage() {
   const [launchSummary, setLaunchSummary] = useState<LaunchSummary | null>(null);
+  const [manifest, setManifest] = useState<FeedManifest | null>(null);
   const [stateRows, setStateRows] = useState<ReturnType<typeof getStateDashboardRowsFromOutcomes>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [summary, outcomes] = await Promise.all([
+      const [summary, nextManifest, outcomes] = await Promise.all([
         loadLaunchSummary(),
+        loadManifest().catch(() => null),
         fetchJson<OutcomeRow[]>("state-outcomes.json").catch(() => [] as OutcomeRow[]),
       ]);
       if (cancelled) return;
       setLaunchSummary(summary);
+      setManifest(nextManifest);
       setStateRows(getStateDashboardRowsFromOutcomes(outcomes));
       setLoading(false);
     })();
@@ -104,9 +107,10 @@ export function HomePage() {
   }, []);
 
   const totals = launchSummary?.totals ?? {};
-  const totalRollCalls = (totals.votes ?? 0);
+  const totalRollCalls = manifest?.datasets.votes?.count ?? totals.votes ?? 0;
   const congressMemberCount = totals.members ?? 0;
   const committeeCount = totals.committees ?? 0;
+  const billCount = manifest?.datasets.bills?.count ?? totals.bills ?? 0;
 
   const topMembers = (launchSummary?.topMembers ?? []).map((m, i) => ({
     rank: i + 1,
@@ -128,7 +132,7 @@ export function HomePage() {
       <main className="min-w-0 flex-1 space-y-6">
         <QueryHero
           title="Political money made legible."
-          subtitle="Politired turns campaign finance, lobbying, and roll-call records into answers normal people can use. Ask a question in plain English, get the ranking, the funding breakdown, the vote record, and the source links."
+          subtitle="PolitiMoney turns campaign finance, lobbying, and roll-call records into answers normal people can use. Ask a question in plain English, get the ranking, the funding breakdown, the vote record, and the source links."
           examples={[
             { label: "Rank all PACs by total receipts", href: "/search?q=Rank%20all%20PACs%20by%20total%20receipts" },
             { label: "Who are the top funded members of Congress?", href: "/search?q=Who%20are%20the%20top%20funded%20members%20of%20Congress%3F" },
@@ -144,22 +148,22 @@ export function HomePage() {
           <SignalTile
             label="Members"
             value={String(congressMemberCount)}
-            note="Canonical Congress members linked to campaign entities."
+            note="Member profiles with campaign money and vote links where available."
           />
           <SignalTile
             label="Roll Calls"
             value={formatCompactNumber(totalRollCalls)}
-            note="Roll-call votes loaded into the static feed."
+            note="Congressional votes you can open, search, and connect back to bills."
           />
           <SignalTile
             label="Committees"
             value={formatCompactNumber(committeeCount)}
-            note="Committees and PACs available in the dataset."
+            note="PACs and party committees ranked by reported money raised."
           />
           <SignalTile
             label="Bills"
-            value={formatCompactNumber(totals.bills ?? 0)}
-            note="Bills indexed in the current feed."
+            value={formatCompactNumber(billCount)}
+            note="Bills you can search, with vote links when roll calls are matched."
           />
         </section>
 
@@ -220,7 +224,7 @@ export function HomePage() {
             actionLabel="Open latest Senate vote"
           />
           <FactCheckPanel
-            title="What Politired shows"
+            title="What PolitiMoney shows"
             summary="Not opinions. Not punditry. Ranked public records with links back to the source system."
             dataPoints={[
               "Questions become rankings instead of opinions.",
@@ -300,10 +304,10 @@ export function HomePage() {
           <ClaimCard
             claim={loading
               ? "Loading the latest run summary…"
-              : `The Politired feed currently links ${congressMemberCount} members, ${formatCompactNumber(totalRollCalls)} roll calls, and ${formatCompactNumber(committeeCount)} committees into one queryable graph.`}
+              : `PolitiMoney currently links ${congressMemberCount} members, ${formatCompactNumber(totalRollCalls)} congressional votes, and ${formatCompactNumber(committeeCount)} committees into one public-record browser.`}
             level="high"
             evidenceCount={4}
-            nonClaim="This does not mean every causal claim is proven. It means the money, member, and vote joins are now inspectable instead of rhetorical."
+            nonClaim="This does not mean the records prove cause and effect. It means the money, member, and vote records are inspectable instead of rhetorical."
             sourceLinks={[
               { label: "Member directory", href: "/members" },
               { label: "Committee directory", href: "/pacs" },

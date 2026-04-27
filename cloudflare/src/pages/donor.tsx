@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Link from "../components/link";
-import { CaveatPanel, ProvenancePanel } from "../components/page-templates";
+import { ProvenancePanel } from "../components/page-templates";
 import {
   PageTitle,
   CoverageStatusBar,
@@ -72,21 +72,16 @@ export function DonorDetailPage() {
           subtitle={`${donorTypeLabel(donor.donorType)} donor${donor.donorEmployer ? ` · ${donor.donorEmployer}` : ""}${donor.donorState ? ` · ${donor.donorState}` : ""}`}
         />
         <CoverageStatusBar freshness="Latest ingestion cycle" quality="medium" />
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-4">
           <ProvenancePanel
             title="Donor profile provenance"
             backend="static-feed"
             runId={undefined}
-            freshness="Latest staged donor read model"
+            freshness="Latest public donor snapshot"
             coverage="Itemized FEC contribution records resolved into donor and recipient summaries."
             sourceSystems={["FEC individual contributions", "FEC committees", "candidate-member crosswalk"]}
             notes="Recipient labels are normalized from available committee and candidate records. The profile is a public-record summary, not an identity verification claim."
           />
-          <CaveatPanel title="Claim boundary">
-            <p>Totals reflect records currently loaded into the local read model.</p>
-            <p>A contribution record does not establish policy influence, intent, or a quid pro quo.</p>
-            <p>Named donors can share names; use employer, state, recipient, and dates before drawing conclusions.</p>
-          </CaveatPanel>
         </div>
 
         <SectionCard title="Overview" subtitle="Aggregate contribution data for this donor.">
@@ -126,7 +121,7 @@ export function DonorDetailPage() {
           <>
             <SectionCard
               title="Recipient type mix"
-              subtitle="Top-recipient dollars grouped by the entity type visible in the read model."
+              subtitle="Top-recipient dollars grouped by the entity type visible in the public records."
             >
               <TableExplorer
                 columns={["Recipient type", "Visible recipients", "Total"]}

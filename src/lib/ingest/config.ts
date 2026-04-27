@@ -50,7 +50,7 @@ export function getIngestConfig(): IngestConfig {
     outcomesYears: parseCycleList(process.env.INGEST_OUTCOMES_YEARS, [2019, 2021, 2023]),
     candidateLimit: parsePositiveInt(process.env.INGEST_CANDIDATE_LIMIT, 800),
     fecCommitteeLimit: parsePositiveInt(process.env.INGEST_FEC_COMMITTEE_LIMIT, 2000),
-    fecContributionLimit: parsePositiveInt(process.env.INGEST_FEC_CONTRIBUTION_LIMIT, 25000),
+    fecContributionLimit: parsePositiveInt(process.env.INGEST_FEC_CONTRIBUTION_LIMIT, 100000),
     fecMaxPagesPerDataset: parsePositiveInt(process.env.INGEST_FEC_MAX_PAGES_PER_DATASET, 500),
     fecContributionPageDelayMs: parseNonNegativeInt(
       process.env.INGEST_FEC_CONTRIBUTION_PAGE_DELAY_MS,

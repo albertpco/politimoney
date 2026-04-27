@@ -5,6 +5,14 @@ import { TrendChart } from "@/components/ui-primitives";
 
 type MetricKey =
   | "gdp"
+  | "gdpPerCapita"
+  | "gdpGrowth"
+  | "medianIncome"
+  | "medianAge"
+  | "bachelorsPlus"
+  | "unemployment"
+  | "taxBurden"
+  | "federalBalance"
   | "population"
   | "childPoverty"
   | "fertility"

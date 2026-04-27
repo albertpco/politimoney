@@ -1,15 +1,4 @@
-import { useEffect, useState } from "react";
-import { fetchJson } from "../lib/feed";
-
-type Contribution = {
-  committeeId: string;
-  committeeName?: string;
-  donorName?: string;
-  amount?: number;
-  contributionDate?: string;
-};
-
-type Committee = { committeeId: string; name: string };
+import { readFecContributions, readFecCommittees } from "@/lib/ingest/storage";
 
 function fmtMoney(n: number): string {
   if (!Number.isFinite(n) || n === 0) return "$0";
@@ -26,57 +15,47 @@ function fmtDate(d: string | Date): string {
 
 function toProperCase(s: string | null | undefined): string {
   if (!s) return "—";
-  return s.toLowerCase().replace(/\b\w+/g, (w) => w[0].toUpperCase() + w.slice(1));
+  return s
+    .toLowerCase()
+    .replace(/\b\w+/g, (w) => w[0].toUpperCase() + w.slice(1));
 }
 
-export function RecentReceiptsTicker({ limit = 8 }: { limit?: number }) {
-  const [items, setItems] = useState<Contribution[] | null>(null);
-  const [committeeMap, setCommitteeMap] = useState<Record<string, string>>({});
+/**
+ * Recent FEC receipts ticker — tabloid-style horizontal strip showing
+ * the latest large reported contributions. Server component.
+ */
+export async function RecentReceiptsTicker({ limit = 8 }: { limit?: number }) {
+  const [contributions, committees] = await Promise.all([
+    readFecContributions(),
+    readFecCommittees(),
+  ]);
+  const committeeNameById = new Map(
+    committees.map((c) => [c.committeeId, c.name]),
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const [contributions, committees] = await Promise.all([
-          fetchJson<Contribution[]>("recent-receipts.json").catch(() => [] as Contribution[]),
-          fetchJson<Committee[]>("committees.json").catch(() => [] as Committee[]),
-        ]);
-        if (cancelled) return;
-        setCommitteeMap(Object.fromEntries(committees.map((c) => [c.committeeId, c.name])));
-        const filtered = contributions
-          .filter(
-            (c) =>
-              Number.isFinite(c.amount) &&
-              (c.amount ?? 0) > 0 &&
-              c.contributionDate &&
-              !Number.isNaN(new Date(c.contributionDate).getTime()),
-          )
-          .sort(
-            (a, b) =>
-              new Date(b.contributionDate as string).getTime() -
-              new Date(a.contributionDate as string).getTime(),
-          )
-          .slice(0, limit);
-        setItems(filtered);
-      } catch {
-        if (!cancelled) setItems([]);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [limit]);
+  const filtered = contributions
+    .filter(
+      (c) =>
+        Number.isFinite(c.amount) &&
+        (c.amount ?? 0) > 0 &&
+        c.contributionDate &&
+        !Number.isNaN(new Date(c.contributionDate).getTime()),
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.contributionDate as string).getTime() -
+        new Date(a.contributionDate as string).getTime(),
+    )
+    .slice(0, limit);
 
-  if (!items || items.length === 0) return null;
-  const latestDate = items[0]?.contributionDate ? fmtDate(items[0].contributionDate) : null;
+  if (!filtered.length) return null;
 
   return (
     <section className="space-y-3">
       <div className="flex items-baseline gap-3">
-        <span className="kicker">Recent FEC receipts</span>
+        <span className="kicker">Fresh receipts</span>
         <span className="hand" style={{ fontSize: 16, transform: "rotate(-1.5deg)", display: "inline-block" }}>
-          {latestDate ? `filed through ${latestDate}` : "newest campaign contributions"}
+          today's biggest checks
         </span>
       </div>
       <div
@@ -88,9 +67,17 @@ export function RecentReceiptsTicker({ limit = 8 }: { limit?: number }) {
           padding: "10px 12px",
         }}
       >
-        <div style={{ display: "flex", gap: 18, whiteSpace: "nowrap", alignItems: "baseline" }}>
-          {items.map((c, i) => {
-            const recipient = c.committeeName ?? committeeMap[c.committeeId] ?? c.committeeId;
+        <div
+          style={{
+            display: "flex",
+            gap: 18,
+            whiteSpace: "nowrap",
+            alignItems: "baseline",
+          }}
+        >
+          {filtered.map((c, i) => {
+            const recipient =
+              c.committeeName ?? committeeNameById.get(c.committeeId) ?? c.committeeId;
             return (
               <div
                 key={`${c.committeeId}-${i}`}
@@ -99,7 +86,8 @@ export function RecentReceiptsTicker({ limit = 8 }: { limit?: number }) {
                   alignItems: "baseline",
                   gap: 8,
                   paddingRight: 18,
-                  borderRight: i < items.length - 1 ? "1px dashed var(--line-soft)" : "none",
+                  borderRight:
+                    i < filtered.length - 1 ? "1px dashed var(--line-soft)" : "none",
                 }}
               >
                 <span

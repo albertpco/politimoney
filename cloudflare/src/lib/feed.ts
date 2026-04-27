@@ -162,11 +162,14 @@ export type VoteRecord = {
   congress?: number;
   rollCallNumber?: number | string;
   startDate?: string;
+  voteDate?: string;
   voteType?: string;
   result?: string;
   question?: string;
   billId?: string;
   legislationUrl?: string;
+  documentType?: string;
+  documentNumber?: string;
 };
 
 export type VoteMemberCast = {

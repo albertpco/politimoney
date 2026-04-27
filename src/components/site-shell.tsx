@@ -58,23 +58,37 @@ function TopNav() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
-    <header className="pt-shell sticky top-0 z-30 border-b backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-4 px-4 py-2.5">
+    <header
+      className="sticky top-0 z-30 border-b"
+      style={{
+        background: "color-mix(in oklab, var(--paper) 88%, transparent)",
+        borderColor: "var(--line)",
+        backdropFilter: "saturate(1.2) blur(8px)",
+      }}
+    >
+      <div className="mx-auto flex w-full max-w-7xl items-center gap-5 px-4 py-3">
         <Link href="/" className="shrink-0">
-          <span className="pt-title text-base">Politired</span>
+          <span className="brand">
+            Politi<span className="dot">·</span><span className="red">money</span>
+          </span>
         </Link>
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav
+          className="hidden items-center gap-4 md:flex"
+          style={{ fontSize: 13, color: "var(--ink-2)" }}
+        >
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                  active
-                    ? "bg-[var(--civic)] text-white"
-                    : "text-slate-700 hover:bg-[var(--surface-soft)]"
-                }`}
+                className="px-0 py-1.5"
+                style={{
+                  borderBottom: `1.5px solid ${active ? "var(--civic)" : "transparent"}`,
+                  color: active ? "var(--ink)" : "var(--ink-2)",
+                  fontWeight: active ? 500 : 400,
+                  textDecoration: "none",
+                }}
               >
                 {item.label}
               </Link>
@@ -82,18 +96,40 @@ function TopNav() {
           })}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <form action="/search" className="hidden items-center gap-2 sm:flex">
+          <form
+            action="/search"
+            className="hidden items-center gap-2 sm:flex"
+            style={{
+              background: "var(--paper-2)",
+              border: "1px solid var(--line-soft)",
+              borderRadius: "var(--r-md)",
+              padding: "6px 10px",
+              minWidth: 280,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--ink-3)" }}>
+              <circle cx="9" cy="9" r="6" />
+              <path d="M13.5 13.5L17 17" />
+            </svg>
             <input
               name="q"
               placeholder="Search members, PACs, bills..."
-              className="pt-input w-44 px-3 py-1.5 text-xs md:w-64"
+              className="flex-1 bg-transparent outline-none"
+              style={{ fontSize: 12.5, color: "var(--ink)" }}
             />
-            <button
-              type="submit"
-              className="pt-button-primary px-3 py-1.5 text-xs"
+            <kbd
+              style={{
+                fontFamily: "var(--font-jetbrains-mono)",
+                fontSize: 10,
+                background: "var(--paper)",
+                border: "1px solid var(--line-soft)",
+                padding: "1px 5px",
+                borderRadius: 3,
+                color: "var(--ink-3)",
+              }}
             >
-              Search
-            </button>
+              ⌘K
+            </kbd>
           </form>
           <Link
             href="/search"
@@ -105,10 +141,33 @@ function TopNav() {
               <path d="M13.5 13.5L17 17" />
             </svg>
           </Link>
+          <Link
+            href="/search?mcp=1"
+            className="hidden items-center gap-1.5 sm:inline-flex"
+            style={{
+              background: "var(--ink)",
+              color: "var(--paper)",
+              padding: "6px 12px",
+              borderRadius: "var(--r-md)",
+              fontSize: 12.5,
+              fontWeight: 500,
+              textDecoration: "none",
+            }}
+          >
+            <span
+              style={{
+                width: 6, height: 6, borderRadius: 999,
+                background: "var(--money)",
+                display: "inline-block",
+              }}
+            />
+            MCP · Claude
+          </Link>
           <button
             type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="rounded-md p-1.5 text-slate-700 hover:bg-[var(--surface-soft)] md:hidden"
+            className="rounded-md p-1.5 md:hidden"
+            style={{ color: "var(--ink-2)" }}
             aria-label="Toggle navigation"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -122,7 +181,10 @@ function TopNav() {
         </div>
       </div>
       {mobileOpen && (
-        <nav className="border-t border-[var(--line)] px-4 py-3 md:hidden">
+        <nav
+          className="px-4 py-3 md:hidden"
+          style={{ borderTop: "1px solid var(--line-soft)" }}
+        >
           <div className="flex flex-col gap-1">
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -131,9 +193,12 @@ function TopNav() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`rounded-md px-3 py-2 text-sm font-semibold ${
-                    active ? "bg-[var(--civic)] text-white" : "text-slate-700 hover:bg-[var(--surface-soft)]"
-                  }`}
+                  className="rounded-md px-3 py-2 text-sm"
+                  style={{
+                    background: active ? "var(--civic-soft)" : "transparent",
+                    color: active ? "var(--civic-ink)" : "var(--ink-2)",
+                    fontWeight: active ? 600 : 500,
+                  }}
                 >
                   {item.label}
                 </Link>
@@ -156,6 +221,19 @@ function TopNav() {
         </nav>
       )}
     </header>
+  );
+}
+
+function McpDock() {
+  return (
+    <Link
+      href="/search?mcp=1"
+      className="mcp-dock"
+      aria-label="Ask about this page via MCP"
+    >
+      <span className="led" />
+      <span className="lbl">Ask about this page</span>
+    </Link>
   );
 }
 
@@ -280,6 +358,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <ContextFilterBar />
         {children}
       </div>
+      <McpDock />
       <footer className="pt-shell mt-10 border-t">
         <div className="pt-muted mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs">
           <p>Public record browser. Nonpartisan. Source-linked.</p>

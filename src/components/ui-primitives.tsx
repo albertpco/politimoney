@@ -194,13 +194,23 @@ export function MetricCard({
   period: string;
   quality?: "high" | "medium" | "partial";
 }) {
+  const isMoney = /^[-(]?\$/.test(value);
+  const direction = /^(\+|▲|up\b|gain)/i.test(delta)
+    ? "up"
+    : /^(-|▼|down\b|loss)/i.test(delta)
+      ? "down"
+      : undefined;
   return (
     <div className="pt-card p-4">
-      <p className="pt-kicker">{label}</p>
-      <p className="pt-title mt-1 text-xl">{value}</p>
-      <p className="pt-muted text-xs leading-5">
-        {delta} ({period}) · coverage {quality}
-      </p>
+      <div className="metric">
+        <span className="label">{label}</span>
+        <span className="value" data-kind={isMoney ? "money" : undefined}>
+          {value}
+        </span>
+        <span className={direction ? `delta ${direction}` : "delta"}>
+          {delta} <span className="muted">({period}) · coverage {quality}</span>
+        </span>
+      </div>
     </div>
   );
 }
@@ -477,12 +487,11 @@ export function StateValueMap({
   const span = Math.max(max - min, 1);
 
   function tone(value: number | undefined): string {
-    if (value === undefined) return "bg-slate-100 text-slate-500 border-slate-200";
+    if (value === undefined) return "usmap-cell";
     const ratio = (value - min) / span;
-    if (ratio > 0.75) return "bg-[var(--civic)] text-white border-[var(--civic)]";
-    if (ratio > 0.5) return "bg-[var(--accent)] text-white border-[var(--accent)]";
-    if (ratio > 0.25) return "bg-[var(--accent-soft)] text-slate-950 border-[var(--accent)]";
-    return "bg-white text-slate-800 border-[var(--line)]";
+    if (ratio > 0.66) return "usmap-cell hot";
+    if (ratio > 0.33) return "usmap-cell warm";
+    return "usmap-cell";
   }
 
   return (
@@ -528,7 +537,7 @@ export function StateValueMap({
           const position = STATE_CARTOGRAM[item.code];
           const cell = (
             <div
-              className={`rounded-md border px-1 py-2 text-center text-[11px] font-semibold shadow-sm transition hover:-translate-y-1 hover:scale-[1.04] hover:shadow-[var(--shadow-lift)] focus-within:-translate-y-1 ${tone(item.value)}`}
+              className={tone(item.value)}
               style={{
                 gridColumn: position.col,
                 gridRow: position.row,
@@ -751,11 +760,28 @@ export function TableExplorer({
     return renderTableCell(cell, `row-${rowIdx}-cell-${cellIdx}`);
   }
 
+  function isNumericCell(cell: TableCellValue): boolean {
+    const s = typeof cell === "string"
+      ? cell
+      : Array.isArray(cell)
+        ? ""
+        : typeof cell.label === "string" ? cell.label : "";
+    if (!s) return false;
+    return /^[-(]?[$%]?\s?[\d,]+(\.\d+)?[%)kKmMbB]?$/.test(s.trim());
+  }
+
   return (
     <div className="space-y-2">
-      <div className="pt-table overflow-x-auto">
-        <table className="min-w-full text-left text-xs">
-          <thead className="pt-table-head">
+      <div
+        className="overflow-x-auto"
+        style={{
+          border: "1px solid var(--line-soft)",
+          borderRadius: "var(--r-lg)",
+          background: "var(--paper)",
+        }}
+      >
+        <table className="t min-w-full">
+          <thead>
             <tr>
               {columns.map((column, colIdx) => {
                 const isAction = column === "";
@@ -763,7 +789,15 @@ export function TableExplorer({
                 return (
                   <th
                     key={`col-${colIdx}`}
-                    className={`px-3 py-2 font-semibold text-slate-700${isAction ? " sticky right-0 bg-[var(--surface-soft)] w-[1%] whitespace-nowrap" : " cursor-pointer select-none hover:text-slate-950"}`}
+                    style={{
+                      cursor: isAction ? "default" : "pointer",
+                      userSelect: "none",
+                      position: isAction ? "sticky" : undefined,
+                      right: isAction ? 0 : undefined,
+                      background: isAction ? "var(--paper-2)" : undefined,
+                      width: isAction ? "1%" : undefined,
+                      whiteSpace: isAction ? "nowrap" : undefined,
+                    }}
                     onClick={isAction ? undefined : () => handleSort(colIdx)}
                   >
                     <span className="inline-flex items-center gap-1">
@@ -782,20 +816,38 @@ export function TableExplorer({
           <tbody>
             {pagedRows.length ? (
               pagedRows.map((row, idx) => (
-                <tr key={`row-${page * pageSize + idx}`} className="border-t border-[var(--line)] bg-white hover:bg-[var(--surface-soft)]">
-                  {row.map((cell, cellIdx) => (
-                    <td
-                      key={`row-${page * pageSize + idx}-cell-${cellIdx}`}
-                      className={`px-3 py-2 text-slate-700${cellIdx === row.length - 1 && columns[cellIdx] === "" ? " sticky right-0 bg-white whitespace-nowrap" : ""}`}
-                    >
-                      {renderTableCellValue(cell, page * pageSize + idx, cellIdx)}
-                    </td>
-                  ))}
+                <tr key={`row-${page * pageSize + idx}`}>
+                  {row.map((cell, cellIdx) => {
+                    const isAction = columns[cellIdx] === "";
+                    const isNumeric = isNumericCell(cell);
+                    const className = isNumeric ? "num" : isAction ? undefined : "name";
+                    return (
+                      <td
+                        key={`row-${page * pageSize + idx}-cell-${cellIdx}`}
+                        className={className}
+                        style={
+                          isAction
+                            ? {
+                                position: "sticky",
+                                right: 0,
+                                background: "var(--paper)",
+                                whiteSpace: "nowrap",
+                              }
+                            : undefined
+                        }
+                      >
+                        {renderTableCellValue(cell, page * pageSize + idx, cellIdx)}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="px-3 py-6 text-center text-slate-500">
+                <td
+                  colSpan={columns.length}
+                  style={{ textAlign: "center", color: "var(--ink-3)", padding: "24px 12px" }}
+                >
                   {emptyState ?? "No data available."}
                 </td>
               </tr>

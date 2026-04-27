@@ -3,8 +3,6 @@ import { useParams } from "react-router-dom";
 import Link from "../components/link";
 import { EntityDetailTemplate, ProvenancePanel } from "../components/page-templates";
 import {
-  ClaimCard,
-  FundingSourceBreakdown,
   MetricCard,
   SectionCard,
   TableExplorer,
@@ -12,8 +10,8 @@ import {
   PartySplitBars,
 } from "../components/ui-primitives";
 import { buildVoteSegments } from "../lib/vote-segments";
-import { VoteSplitCards } from "../components/vote-split-cards";
-import { loadHouseVote, loadSenateVote, type VoteDetail } from "../lib/feed";
+import { loadHouseVote, loadIndex, loadSenateVote, type VoteDetail } from "../lib/feed";
+import { congressBillUrl } from "../lib/congress-links";
 
 function formatDate(value?: string | Date): string {
   if (!value) return "—";
@@ -36,6 +34,7 @@ export function VoteDetailPage({ chamber }: { chamber: "H" | "S" }) {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<VoteDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [billHref, setBillHref] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -43,7 +42,23 @@ export function VoteDetailPage({ chamber }: { chamber: "H" | "S" }) {
     const loader = chamber === "H" ? loadHouseVote : loadSenateVote;
     loader(id)
       .then((d) => {
-        if (!cancelled) setData(d);
+        if (!cancelled) {
+          setData(d);
+          const billId = d.vote.billId?.toLowerCase();
+          if (!billId) {
+            setBillHref(null);
+            return;
+          }
+          loadIndex("bills")
+            .then((bills) => {
+              if (!cancelled) {
+                setBillHref(bills.some((bill) => bill.id.toLowerCase() === billId) ? `/bills/${billId}` : null);
+              }
+            })
+            .catch(() => {
+              if (!cancelled) setBillHref(null);
+            });
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load vote");
@@ -76,6 +91,14 @@ export function VoteDetailPage({ chamber }: { chamber: "H" | "S" }) {
   ]
     .filter(Boolean)
     .join(" · ");
+  const congressUrl =
+    vote.legislationUrl ??
+    congressBillUrl({
+      congress: vote.congress,
+      billType: vote.documentType,
+      billNumber: vote.documentNumber,
+      billId: vote.billId,
+    });
 
   // Build party + overall breakdowns
   let voteBreakdown: React.ReactNode = null;
@@ -116,25 +139,14 @@ export function VoteDetailPage({ chamber }: { chamber: "H" | "S" }) {
     <EntityDetailTemplate
       title={question}
       subtitle={subtitle}
-      summary={
-        <ClaimCard
-          claim={`This ${chamberLabel} vote is linked to ${analysisGroups.length} funding groups and ${memberVotes.length} member vote records.`}
-          level="high"
-          evidenceCount={Math.max(analysisGroups.length, 1)}
-          nonClaim="The funding split shows association across vote groups and linked receipts. It does not, by itself, establish causation."
-          sourceLinks={[
-            { label: "Votes hub", href: "/votes" },
-            ...(vote.billId ? [{ label: vote.billId, href: `/bills/${vote.billId.toLowerCase()}` }] : []),
-          ]}
-        />
-      }
       sidebar={
         <ProvenancePanel
           title={`${chamberLabel} vote provenance`}
           backend="static-feed"
-          freshness="Latest staged vote record"
+          freshness="Latest public vote snapshot"
           coverage="Linked bill context and funding groups when available."
           sourceSystems={[`${chamberLabel} roll calls`, "FEC candidate financials"]}
+          sourceLinks={congressUrl ? [{ label: "Open linked measure on Congress.gov", href: congressUrl, external: true }] : undefined}
           notes="Open the member vote table to jump from a vote record into a member profile."
         />
       }
@@ -154,105 +166,91 @@ export function VoteDetailPage({ chamber }: { chamber: "H" | "S" }) {
           period="roll-call outcome"
           quality="high"
         />
-        <MetricCard
-          label="Bill"
-          value={vote.billId ?? "—"}
-          delta="Linked bill identifier"
-          period="current record"
-          quality={vote.billId ? "high" : "medium"}
-        />
+        <div className="pt-card p-4">
+          <div className="metric">
+            <span className="label">Bill identifier</span>
+            {congressUrl ? (
+              <a
+                href={congressUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="value pt-link"
+                style={{ color: "var(--source)", textDecorationThickness: "1px" }}
+              >
+                {vote.billId ?? "Open measure"}
+              </a>
+            ) : (
+              <span className="value">{vote.billId ?? "—"}</span>
+            )}
+            <span className="delta">
+              {congressUrl ? "Open on Congress.gov" : "Linked measure"} <span className="muted">(public record)</span>
+            </span>
+          </div>
+        </div>
       </section>
 
       {voteBreakdown}
 
       <SectionCard
-        title="Funding context"
-        subtitle="Vote groups ranked by member count, with receipt buckets from linked FEC candidate financials."
+        title="Who voted how"
+        subtitle={`${chamberLabel} members on this roll call, with party, state, vote, and profile links.`}
+      >
+        {memberVotes.length ? (
+          <TableExplorer
+            columns={["Member", "Vote", "Party", "State", "Profile"]}
+            rows={memberVotes.map((mv) => [
+              memberLabel(mv),
+              mv.voteCast ?? "—",
+              mv.voteParty ?? "—",
+              mv.voteState ?? "—",
+              { label: "Open profile", href: `/members/${mv.bioguideId.toLowerCase()}` },
+            ])}
+          />
+        ) : (
+          <p className="pt-muted text-sm">No member vote records are available for this roll call in the public record snapshot.</p>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="Funding boundary"
+        subtitle="Money shown here is context around member vote groups, not an explanation for a vote."
       >
         {analysisGroups.length ? (
-          <div className="space-y-6">
-            <VoteSplitCards
-              groups={analysisGroups.map((g) => ({
-                voteCast: g.voteCast,
-                memberCount: g.memberCount ?? 0,
-                matchedCandidateCount: g.candidateMatched ?? 0,
-                totalReceipts: g.totalReceipts ?? 0,
-              }))}
-              caveat={
-                <span>
-                  Money on each side reflects <b>career receipts</b> of members who voted that way — it shows{" "}
-                  <b>association</b>, not causation. A side raising more from a sector has not necessarily voted for that sector.
-                </span>
-              }
-            />
+          <div className="space-y-4">
+            <div className="caveat">
+              <span className="badge">Boundary</span>
+              <div>
+                Public money records are not clear proof of why anyone voted. Use the member table above for party, state, vote, and profile links.
+              </div>
+            </div>
             {analysisGroups.map((group) => (
               <div key={group.voteCast} className="pt-panel space-y-3 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="pt-title text-base">{group.voteCast}</h3>
                     <p className="pt-muted text-sm">
-                      {group.memberCount ?? 0} members · {group.candidateMatched ?? 0} matched candidate records · $
-                      {Math.round(group.totalReceipts ?? 0).toLocaleString()} linked receipts
+                      {group.memberCount ?? 0} members in this vote group
                     </p>
                   </div>
-                  <span className="pt-badge">Association, not causation</span>
+                  <span className="pt-badge">Context only</span>
                 </div>
-                {group.sourceBreakdown?.length ? (
-                  <FundingSourceBreakdown
-                    title="Receipt source mix"
-                    sources={group.sourceBreakdown.map((s) => ({
-                      label: s.label,
-                      value: s.amount,
-                      detail: `${(s.share * 100).toFixed(1)}% of receipts`,
-                    }))}
-                  />
-                ) : null}
-                {group.topMembers?.length ? (
-                  <TableExplorer
-                    columns={["Top linked members", "Candidate receipts"]}
-                    rows={group.topMembers.map((m) => [
-                      m.name,
-                      `$${Math.round(m.total).toLocaleString()}`,
-                    ])}
-                  />
-                ) : null}
               </div>
             ))}
           </div>
         ) : (
-          <p className="pt-muted text-sm">
-            No funding analysis summary is available for this vote yet. The roll-call record can still be inspected, but candidate financial joins were not available for this vote.
-          </p>
-        )}
-      </SectionCard>
-
-      <SectionCard
-        title="Member vote records"
-        subtitle={`${chamberLabel} members tied to this roll call, with links into member profiles.`}
-      >
-        {memberVotes.length ? (
-          <TableExplorer
-            columns={["Member", "Vote cast", "Party", "State", "Route"]}
-            rows={memberVotes.map((mv) => [
-              memberLabel(mv),
-              mv.voteCast ?? "—",
-              mv.voteParty ?? "—",
-              mv.voteState ?? "—",
-              { label: "Open", href: `/members/${mv.bioguideId.toLowerCase()}` },
-            ])}
-          />
-        ) : (
-          <p className="pt-muted text-sm">No member vote records are available for this roll call in the current dataset.</p>
+          <p className="pt-muted text-sm">No funding comparison is available for this vote. The member vote table below is still the primary record.</p>
         )}
       </SectionCard>
 
       <SectionCard title="Next step" subtitle="Move from the vote record to the underlying bill or back to the vote hub.">
         <div className="flex flex-wrap gap-3">
           <Link href="/votes" className="pt-button-secondary px-4 py-2 text-sm">Back to votes</Link>
-          {vote.billId ? (
-            <Link href={`/bills/${vote.billId.toLowerCase()}`} className="pt-button-primary px-4 py-2 text-sm">
-              Open linked bill
+          {billHref ? (
+            <Link href={billHref} className="pt-button-secondary px-4 py-2 text-sm">
+              Open PolitiMoney bill page
             </Link>
+          ) : vote.billId ? (
+            <span className="pt-muted self-center text-sm">Linked bill page unavailable in this snapshot: {vote.billId}</span>
           ) : null}
         </div>
       </SectionCard>

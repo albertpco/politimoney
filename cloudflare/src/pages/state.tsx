@@ -131,7 +131,7 @@ export function StateDetailPage() {
   if (!stateEntity) {
     return (
       <main>
-        <SectionCard title="State not in feed" subtitle="Outcome data hasn't been staged for this state yet.">
+        <SectionCard title="State not available" subtitle="Outcome data is not available for this state yet.">
           <Link className="pt-link" href="/states">Back to states</Link>
         </SectionCard>
       </main>

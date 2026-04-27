@@ -25,6 +25,10 @@ import {
   getDataBackendMode,
   getLatestRunSummaryRepository,
 } from "@/lib/data/repository";
+import { getMemberFundingRanking } from "@/lib/data/peer-ranking";
+import { PeerRail } from "@/components/design-primitives";
+import { MemberSankey } from "@/components/member-sankey";
+import { MemberTimeline } from "@/components/member-timeline";
 
 export const revalidate = 3600;
 
@@ -70,7 +74,7 @@ export default async function MemberDetailPage({ params }: MemberDetailPageProps
   if (!member) notFound();
 
   const chamber = member.chamber === "S" ? "S" : "H";
-  const [fundingProfile, committees, recentVotes, backend, runSummary] = await Promise.all([
+  const [fundingProfile, committees, recentVotes, backend, runSummary, peerRanking] = await Promise.all([
     getFundingProfileRepository(member.bioguideId),
     getLatestCommitteesRepository(),
     getRecentMemberVotePositionsRepository({
@@ -80,6 +84,7 @@ export default async function MemberDetailPage({ params }: MemberDetailPageProps
     }),
     getDataBackendMode(),
     getLatestRunSummaryRepository(),
+    getMemberFundingRanking(member.bioguideId),
   ]);
   const linkedCommittees = committees.filter((committee) =>
     fundingProfile?.committeeIds.includes(committee.committeeId),
@@ -91,9 +96,25 @@ export default async function MemberDetailPage({ params }: MemberDetailPageProps
     voteCounts[vote.voteCast] = (voteCounts[vote.voteCast] ?? 0) + 1;
   }
 
+  function fmtMoneyShort(n: number): string {
+    if (!Number.isFinite(n) || n === 0) return "$0";
+    if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+    if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+    if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+    return `$${Math.round(n).toLocaleString()}`;
+  }
+
   return (
-    <div className="flex gap-4">
-      <main className="min-w-0 flex-1 space-y-6">
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) 280px",
+        gap: 32,
+        alignItems: "start",
+      }}
+      className="member-detail-grid"
+    >
+      <main className="min-w-0 space-y-6">
         <SectionCard
           title={member.name}
           subtitle={`${member.chamber === "S" ? "Senator" : "Representative"} · ${member.partyCode ?? member.party ?? "—"} · ${member.state}${member.district ? `-${member.district}` : ""}`}
@@ -176,6 +197,40 @@ export default async function MemberDetailPage({ params }: MemberDetailPageProps
           </SectionCard>
         ) : null}
 
+        {fundingProfile && fundingProfile.totalReceipts > 0 ? (
+          <SectionCard
+            title="Money flow"
+            subtitle="Receipt sources flowing into the campaign — sketchy diagram, not a precise chart."
+          >
+            <MemberSankey
+              sources={[
+                { label: "Individual contributions", value: fundingProfile.totalIndividualContributions ?? 0 },
+                { label: "Other committees", value: fundingProfile.otherCommitteeContributions ?? 0 },
+                { label: "Party committees", value: fundingProfile.partyContributions ?? 0 },
+                { label: "Independent expenditures", value: fundingProfile.independentExpenditures ?? 0 },
+              ]}
+              targetLabel={member.name}
+            />
+          </SectionCard>
+        ) : null}
+
+        {recentVotes.length ? (
+          <SectionCard
+            title="Recent activity"
+            subtitle="Vote positions across the most recent congressional sessions."
+          >
+            <MemberTimeline
+              votes={recentVotes
+                .filter((v) => v.happenedAt)
+                .map((v) => ({
+                  date: v.happenedAt as string,
+                  voteCast: v.voteCast,
+                  question: v.question,
+                }))}
+            />
+          </SectionCard>
+        ) : null}
+
         {recentVotes.length ? (
           <SectionCard
             title="Recent voting record"
@@ -239,6 +294,35 @@ export default async function MemberDetailPage({ params }: MemberDetailPageProps
           </div>
         </SectionCard>
       </main>
+      <aside style={{ minWidth: 0 }} className="member-detail-aside">
+        {peerRanking?.you ? (
+          <PeerRail
+            title={`Receipts rank · ${peerRanking.chamber === "S" ? "Senate" : "House"}`}
+            totalLabel={`${peerRanking.you.rank.toString().padStart(2, "0")} / ${peerRanking.totalRanked}`}
+            rows={peerRanking.window.map((row) => ({
+              rank: row.rank,
+              label: (
+                <span>
+                  <span style={{ fontWeight: row.bioguideId === member.bioguideId ? 600 : 500 }}>
+                    {row.name}
+                  </span>
+                  <span style={{ color: "var(--ink-3)", fontSize: 11, marginLeft: 6 }}>
+                    {row.party ?? ""} · {row.state ?? ""}
+                  </span>
+                </span>
+              ),
+              value: fmtMoneyShort(row.totalReceipts),
+              isYou: row.bioguideId === member.bioguideId,
+              href: `/members/${row.bioguideId}`,
+            }))}
+          />
+        ) : null}
+      </aside>
+      <style>{`
+        @media (max-width: 900px) {
+          .member-detail-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }

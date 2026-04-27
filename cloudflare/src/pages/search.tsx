@@ -102,7 +102,7 @@ export function SearchPage() {
           ]}
         />
 
-        <SectionCard title="Query" subtitle="Search across all staged indexes — members, PACs, donors, bills, votes, states, and trades.">
+        <SectionCard title="Query" subtitle="Search members, PACs, donors, bills, votes, states, and congressional trades.">
           <form onSubmit={onSubmit} className="flex flex-wrap items-center gap-3">
             <input
               value={q}
@@ -114,14 +114,14 @@ export function SearchPage() {
             <button type="submit" className="pt-button-primary px-4 py-2 text-sm">Search</button>
           </form>
           <p className="pt-muted mt-2 text-xs">
-            {loading ? "Loading indexes…" : `${allEntries.length.toLocaleString()} records loaded across ${SEARCH_DATASETS.length} datasets.`}
+            {loading ? "Loading records…" : `${allEntries.length.toLocaleString()} searchable public records across ${SEARCH_DATASETS.length} categories.`}
           </p>
         </SectionCard>
 
         {q.trim() ? (
           <SectionCard title={`Results for "${q.trim()}"`} subtitle={`${results.length} matches found.`}>
             {results.length === 0 ? (
-              <p className="pt-muted text-sm">No records match this query in the staged feed. Try a different term or browse a directory.</p>
+              <p className="pt-muted text-sm">No records match this query. Try a different term or browse a directory.</p>
             ) : (
               <TableExplorer
                 columns={["Name", "Type", "Context", "Route"]}

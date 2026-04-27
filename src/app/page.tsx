@@ -16,6 +16,7 @@ import {
   SignalTile,
   WorkflowCard,
 } from "@/components/politired-surfaces";
+import { RecentReceiptsTicker } from "@/components/recent-receipts-ticker";
 import {
   analyzeHouseVoteFundingRepository,
   analyzeSenateVoteFundingRepository,
@@ -168,6 +169,8 @@ export default async function Home() {
           ]}
         />
 
+        <RecentReceiptsTicker limit={10} />
+
         <section className="grid gap-3 md:grid-cols-4">
           <SignalTile
             label="Contributions"
@@ -203,6 +206,86 @@ export default async function Home() {
                 href: `/states/${s.id}`,
               }))}
               metrics={[
+                {
+                  key: "gdp-per-capita",
+                  label: "GDP / capita",
+                  metricLabel: "GDP per capita (USD)",
+                  items: stateRows.map((s) => ({
+                    code: s.code,
+                    value: s.gdpPerCapitaValue,
+                    href: `/states/${s.id}`,
+                  })),
+                },
+                {
+                  key: "gdp-growth",
+                  label: "GDP growth",
+                  metricLabel: "Real GDP growth, percent y/y",
+                  items: stateRows.map((s) => ({
+                    code: s.code,
+                    value: s.gdpGrowthPctValue,
+                    href: `/states/${s.id}`,
+                  })),
+                },
+                {
+                  key: "median-income",
+                  label: "Median income",
+                  metricLabel: "Median household income (USD)",
+                  items: stateRows.map((s) => ({
+                    code: s.code,
+                    value: s.medianIncomeValue,
+                    href: `/states/${s.id}`,
+                  })),
+                },
+                {
+                  key: "bachelors-plus",
+                  label: "Bachelor's+",
+                  metricLabel: "Pct. age 25+ with bachelor's degree or higher",
+                  items: stateRows.map((s) => ({
+                    code: s.code,
+                    value: s.bachelorsPlusValue,
+                    href: `/states/${s.id}`,
+                  })),
+                },
+                {
+                  key: "unemployment",
+                  label: "Unemployment",
+                  metricLabel: "Annual unemployment rate, percent",
+                  items: stateRows.map((s) => ({
+                    code: s.code,
+                    value: s.unemploymentValue,
+                    href: `/states/${s.id}`,
+                  })),
+                },
+                {
+                  key: "tax-burden",
+                  label: "Tax burden",
+                  metricLabel: "State+local taxes as pct. of state product",
+                  items: stateRows.map((s) => ({
+                    code: s.code,
+                    value: s.taxBurdenValue,
+                    href: `/states/${s.id}`,
+                  })),
+                },
+                {
+                  key: "federal-balance",
+                  label: "Fed. balance",
+                  metricLabel: "Net federal $ per resident (received minus paid)",
+                  items: stateRows.map((s) => ({
+                    code: s.code,
+                    value: s.federalBalanceValue,
+                    href: `/states/${s.id}`,
+                  })),
+                },
+                {
+                  key: "median-age",
+                  label: "Median age",
+                  metricLabel: "Median age, years",
+                  items: stateRows.map((s) => ({
+                    code: s.code,
+                    value: s.medianAgeValue,
+                    href: `/states/${s.id}`,
+                  })),
+                },
                 {
                   key: "child-poverty",
                   label: "Child poverty",

@@ -174,14 +174,32 @@ export default async function StateDetailPage({ params }: StateDetailPageProps) 
       key: "gdp",
       label: "GDP",
       value: stateEntity.gdp,
-      delta: "state economic feed pending",
-      period: "latest",
-      quality: stateEntity.gdp === "N/A" ? "partial" : "medium",
+      delta:
+        stateEntity.gdpGrowth && stateEntity.gdpGrowth !== "N/A"
+          ? `${stateEntity.gdpGrowth} y/y real`
+          : "BEA",
+      period: "2023",
+      quality: stateEntity.gdp === "N/A" ? "partial" : "high",
       chartTitle: `${stateEntity.name} GDP benchmark trend`,
       chartUnit: "trillions USD",
       chartPoints: buildBenchmarkPoints({
         allValues: stateRows.map((entry) => parseGdpToTrillions(entry.gdp)),
         currentValue: parseGdpToTrillions(stateEntity.gdp),
+        stateCode: stateEntity.code,
+      }),
+    },
+    {
+      key: "gdpPerCapita",
+      label: "GDP per capita",
+      value: stateEntity.gdpPerCapita,
+      delta: "BEA / ACS",
+      period: "2023",
+      quality: stateEntity.gdpPerCapita === "N/A" ? "partial" : "high",
+      chartTitle: `${stateEntity.name} GDP per capita benchmark trend`,
+      chartUnit: "USD per resident",
+      chartPoints: buildBenchmarkPoints({
+        allValues: stateRows.map((entry) => entry.gdpPerCapitaValue),
+        currentValue: stateEntity.gdpPerCapitaValue,
         stateCode: stateEntity.code,
       }),
     },
@@ -200,6 +218,96 @@ export default async function StateDetailPage({ params }: StateDetailPageProps) 
         ),
         currentValue:
           stateEntity.populationValue !== undefined ? stateEntity.populationValue / 1_000_000 : undefined,
+        stateCode: stateEntity.code,
+      }),
+    },
+    {
+      key: "medianIncome",
+      label: "Median household income",
+      value: stateEntity.medianIncome,
+      delta: "ACS S1903",
+      period: "2023",
+      quality: stateEntity.medianIncome === "N/A" ? "partial" : "high",
+      chartTitle: `${stateEntity.name} median household income`,
+      chartUnit: "USD",
+      chartPoints: buildBenchmarkPoints({
+        allValues: stateRows.map((entry) => entry.medianIncomeValue),
+        currentValue: stateEntity.medianIncomeValue,
+        stateCode: stateEntity.code,
+      }),
+    },
+    {
+      key: "medianAge",
+      label: "Median age",
+      value: stateEntity.medianAge,
+      delta: "ACS S0101",
+      period: "2023",
+      quality: stateEntity.medianAge === "N/A" ? "partial" : "high",
+      chartTitle: `${stateEntity.name} median age`,
+      chartUnit: "years",
+      chartPoints: buildBenchmarkPoints({
+        allValues: stateRows.map((entry) => entry.medianAgeValue),
+        currentValue: stateEntity.medianAgeValue,
+        stateCode: stateEntity.code,
+      }),
+    },
+    {
+      key: "bachelorsPlus",
+      label: "Bachelor's+",
+      value: stateEntity.bachelorsPlus,
+      delta: "ACS S1501, age 25+",
+      period: "2023",
+      quality: stateEntity.bachelorsPlus === "N/A" ? "partial" : "high",
+      chartTitle: `${stateEntity.name} share with bachelor's degree or higher`,
+      chartUnit: "percent of pop. age 25+",
+      chartPoints: buildBenchmarkPoints({
+        allValues: stateRows.map((entry) => entry.bachelorsPlusValue),
+        currentValue: stateEntity.bachelorsPlusValue,
+        stateCode: stateEntity.code,
+      }),
+    },
+    {
+      key: "unemployment",
+      label: "Unemployment",
+      value: stateEntity.unemployment,
+      delta: "BLS LAUS",
+      period: "2024",
+      quality: stateEntity.unemployment === "N/A" ? "partial" : "high",
+      chartTitle: `${stateEntity.name} unemployment rate`,
+      chartUnit: "percent",
+      chartPoints: buildBenchmarkPoints({
+        allValues: stateRows.map((entry) => entry.unemploymentValue),
+        currentValue: stateEntity.unemploymentValue,
+        stateCode: stateEntity.code,
+      }),
+    },
+    {
+      key: "taxBurden",
+      label: "Tax burden",
+      value: stateEntity.taxBurden,
+      delta: "Tax Foundation, state+local",
+      period: "2022",
+      quality: stateEntity.taxBurden === "N/A" ? "partial" : "medium",
+      chartTitle: `${stateEntity.name} state+local tax burden`,
+      chartUnit: "percent of state net product",
+      chartPoints: buildBenchmarkPoints({
+        allValues: stateRows.map((entry) => entry.taxBurdenValue),
+        currentValue: stateEntity.taxBurdenValue,
+        stateCode: stateEntity.code,
+      }),
+    },
+    {
+      key: "federalBalance",
+      label: "Federal balance / capita",
+      value: stateEntity.federalBalance,
+      delta: "Rockefeller Institute",
+      period: "2022",
+      quality: stateEntity.federalBalance === "N/A" ? "partial" : "medium",
+      chartTitle: `${stateEntity.name} net federal funds per resident`,
+      chartUnit: "USD per resident (positive = receives more than pays)",
+      chartPoints: buildBenchmarkPoints({
+        allValues: stateRows.map((entry) => entry.federalBalanceValue),
+        currentValue: stateEntity.federalBalanceValue,
         stateCode: stateEntity.code,
       }),
     },
@@ -299,9 +407,20 @@ export default async function StateDetailPage({ params }: StateDetailPageProps) 
           <MetricCard
             label="GDP"
             value={stateEntity.gdp}
-            delta=""
-            period="latest"
-            quality={stateEntity.gdp === "N/A" ? "partial" : "medium"}
+            delta={
+              stateEntity.gdpGrowth && stateEntity.gdpGrowth !== "N/A"
+                ? `${stateEntity.gdpGrowth} y/y real`
+                : "BEA"
+            }
+            period={stateEntity.gdp === "N/A" ? "latest" : "2023"}
+            quality={stateEntity.gdp === "N/A" ? "partial" : "high"}
+          />
+          <MetricCard
+            label="GDP per capita"
+            value={stateEntity.gdpPerCapita}
+            delta="BEA / ACS"
+            period="2023"
+            quality={stateEntity.gdpPerCapita === "N/A" ? "partial" : "high"}
           />
           <MetricCard label="Population" value={stateEntity.pop} delta="ACS" period="latest" />
           <MetricCard
@@ -327,6 +446,48 @@ export default async function StateDetailPage({ params }: StateDetailPageProps) 
             value={stateEntity.suicideRate}
             delta="CDC age-adjusted rate"
             period="latest"
+          />
+          <MetricCard
+            label="Median household income"
+            value={stateEntity.medianIncome}
+            delta="ACS S1903"
+            period="2023"
+            quality={stateEntity.medianIncome === "N/A" ? "partial" : "high"}
+          />
+          <MetricCard
+            label="Median age"
+            value={stateEntity.medianAge}
+            delta="ACS S0101"
+            period="2023"
+            quality={stateEntity.medianAge === "N/A" ? "partial" : "high"}
+          />
+          <MetricCard
+            label="Bachelor's+ (age 25+)"
+            value={stateEntity.bachelorsPlus}
+            delta="ACS S1501"
+            period="2023"
+            quality={stateEntity.bachelorsPlus === "N/A" ? "partial" : "high"}
+          />
+          <MetricCard
+            label="Unemployment"
+            value={stateEntity.unemployment}
+            delta="BLS LAUS"
+            period="2024"
+            quality={stateEntity.unemployment === "N/A" ? "partial" : "high"}
+          />
+          <MetricCard
+            label="State+local tax burden"
+            value={stateEntity.taxBurden}
+            delta="Tax Foundation"
+            period="2022"
+            quality={stateEntity.taxBurden === "N/A" ? "partial" : "medium"}
+          />
+          <MetricCard
+            label="Federal balance / capita"
+            value={stateEntity.federalBalance}
+            delta="Rockefeller Institute"
+            period="2022"
+            quality={stateEntity.federalBalance === "N/A" ? "partial" : "medium"}
           />
         </div>
       </SectionCard>

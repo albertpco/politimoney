@@ -1,15 +1,27 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { Caveat, Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import { SiteShell } from "@/components/site-shell";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-ibm-plex-mono",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  axes: ["opsz", "SOFT"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+const caveat = Caveat({
+  variable: "--font-caveat",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
 });
@@ -21,17 +33,15 @@ export const metadata: Metadata = {
     "Searchable political-money intelligence with receipts: who funds whom, how they vote, and what the public record actually shows.",
 };
 
-const mono = plexMono;
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="civic">
       <body
-        className={`${spaceGrotesk.variable} ${mono.variable} bg-background antialiased`}
+        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${caveat.variable} antialiased`}
       >
         <SiteShell>{children}</SiteShell>
       </body>

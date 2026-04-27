@@ -10,46 +10,119 @@ export function QueryHero({
   examples: Array<{ label: string; href: string }>;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-lg border border-[var(--civic)] bg-[var(--civic)] px-6 py-8 text-white shadow-[var(--shadow-lift)] sm:px-8">
-      <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#ffffff,var(--accent-soft),var(--danger-soft))]" />
-      <div className="absolute bottom-0 right-0 h-40 w-2/3 bg-[linear-gradient(135deg,transparent,rgba(255,255,255,0.10))]" />
-      <div className="relative space-y-6">
-        <div className="space-y-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-soft)]">
-            Political Money, Without The Spin
-          </p>
-          <h1 className="max-w-4xl text-4xl font-black text-white sm:text-5xl">
-            {title}
-          </h1>
-          <p className="max-w-3xl text-base leading-7 text-slate-100">{subtitle}</p>
-        </div>
-        <form
-          action="/search"
-          className="flex flex-col gap-3 rounded-md border border-white/25 bg-white/10 p-4 backdrop-blur sm:flex-row sm:items-center"
-        >
-          <input
-            name="q"
-            placeholder="Rank PACs by receipts, compare states on poverty, find a member's funding profile"
-            className="min-w-0 flex-1 rounded-md border border-white/30 bg-white px-4 py-3 text-sm text-slate-950 outline-none placeholder:text-slate-500 focus:ring-2 focus:ring-[var(--accent-soft)]"
-          />
-          <button
-            type="submit"
-            className="rounded-md bg-white px-5 py-3 text-sm font-black text-[var(--civic)] hover:bg-[var(--accent-soft)]"
-          >
-            Ask PolitiMoney
-          </button>
-        </form>
-        <div className="flex flex-wrap gap-2">
-          {examples.map((example) => (
-            <Link
-              key={example.href}
-              href={example.href}
-              className="rounded-md border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20"
+    <section className="relative" style={{ paddingBlock: "12px 8px" }}>
+      <div
+        className="kicker"
+        style={{ display: "flex", alignItems: "center", gap: 8 }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: 999,
+            background: "var(--good)",
+            display: "inline-block",
+          }}
+        />
+        Public research · Updated continuously
+      </div>
+      <h1
+        className="serif"
+        style={{
+          fontSize: "clamp(34px, 4vw, 56px)",
+          lineHeight: 1.05,
+          letterSpacing: "-0.025em",
+          fontWeight: 500,
+          margin: "8px 0 14px",
+          maxWidth: "20ch",
+          color: "var(--ink)",
+        }}
+      >
+        {title.split(/(\$[^\s.]+|money|funding)/i).map((chunk, i) =>
+          /^(\$|money|funding)/i.test(chunk) ? (
+            <em
+              key={i}
+              style={{ fontStyle: "italic", color: "var(--money-ink)" }}
             >
-              {example.label}
-            </Link>
-          ))}
-        </div>
+              {chunk}
+            </em>
+          ) : (
+            <span key={i}>{chunk}</span>
+          ),
+        )}
+      </h1>
+      <p
+        style={{
+          fontSize: 16,
+          color: "var(--ink-2)",
+          maxWidth: "60ch",
+          margin: "0 0 20px",
+        }}
+      >
+        {subtitle}
+      </p>
+      <form
+        action="/search"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          background: "var(--paper)",
+          border: "1.5px solid var(--ink)",
+          borderRadius: "var(--r-md)",
+          padding: "14px 16px",
+          boxShadow: "var(--shadow-1)",
+        }}
+      >
+        <input
+          name="q"
+          placeholder="Ask anything — rank PACs, find a member's funders, compare states…"
+          style={{
+            flex: 1,
+            border: "none",
+            outline: "none",
+            background: "transparent",
+            font: "inherit",
+            fontSize: 16,
+            color: "var(--ink)",
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            background: "var(--ink)",
+            color: "var(--paper)",
+            border: "1px solid var(--ink)",
+            borderRadius: "var(--r-md)",
+            padding: "8px 14px",
+            font: "inherit",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          Ask
+        </button>
+      </form>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+          marginTop: 14,
+        }}
+      >
+        {examples.map((example) => (
+          <Link
+            key={example.href}
+            href={example.href}
+            className="pill dashed"
+            style={{ textDecoration: "none", cursor: "pointer" }}
+          >
+            {example.label}
+          </Link>
+        ))}
       </div>
     </section>
   );
@@ -96,13 +169,16 @@ export function SignalTile({
   value: string;
   note: string;
 }) {
+  const isMoney = /^\$/.test(value);
   return (
     <div className="pt-card p-4">
-      <p className="pt-kicker">
-        {label}
-      </p>
-      <p className="pt-title mt-2 text-3xl">{value}</p>
-      <p className="pt-muted mt-2 text-xs leading-5">{note}</p>
+      <div className="metric">
+        <span className="label">{label}</span>
+        <span className="value" data-kind={isMoney ? "money" : undefined}>
+          {value}
+        </span>
+        <span className="delta">{note}</span>
+      </div>
     </div>
   );
 }

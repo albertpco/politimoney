@@ -143,8 +143,7 @@ export function EvidenceTrailDrawer({
 export function CausalityWarningBlock() {
   return (
     <div className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] p-3 text-xs text-slate-950">
-      This panel shows associations and verified linkages. It does not, by itself,
-      establish direct causal responsibility for downstream outcomes.
+      This panel shows public-record links. It does not, by itself, explain why an outcome happened.
     </div>
   );
 }
@@ -184,7 +183,6 @@ export function MetricCard({
   value,
   delta,
   period,
-  quality = "medium",
 }: {
   label: string;
   value: string;
@@ -206,7 +204,7 @@ export function MetricCard({
           {value}
         </span>
         <span className={direction ? `delta ${direction}` : "delta"}>
-          {delta} <span className="muted">({period}) · coverage {quality}</span>
+          {delta} <span className="muted">({period})</span>
         </span>
       </div>
     </div>

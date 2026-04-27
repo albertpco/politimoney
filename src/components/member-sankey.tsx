@@ -1,3 +1,9 @@
+/**
+ * Sketchy sankey — a hand-drawn-style money-flow diagram from receipt
+ * sources into a single recipient node. Sized proportionally to value;
+ * stroke uses dasharray + slight rotation jitter for the "sketchy" energy
+ * the design system reserves for diagrams.
+ */
 type Source = { label: string; value: number };
 
 function fmtMoney(n: number): string {
@@ -20,24 +26,24 @@ export function MemberSankey({
   if (!visible.length || total === 0) return null;
 
   const W = 720;
-  const H = 300;
-  const padX = 34;
-  const leftX = 44;
-  const sourceW = 154;
-  const rightW = 150;
-  const rightX = W - padX - rightW;
+  const H = 320;
+  const padX = 24;
+  const leftX = padX + 90;
+  const rightX = W - padX - 110;
 
-  const gap = 12;
-  const usableH = H - padX * 2 - 28 - gap * (visible.length - 1);
-  const sourceNodes = visible.reduce<Array<Source & { y: number; h: number }>>((nodes, s) => {
-    const h = Math.max(46, (s.value / total) * usableH);
-    const previous = nodes.at(-1);
-    const y = previous ? previous.y + previous.h + gap : padX + 18;
-    return [...nodes, { ...s, y, h }];
-  }, []);
+  // distribute source nodes vertically by share, with small gaps between
+  const gap = 8;
+  const usableH = H - padX * 2 - gap * (visible.length - 1);
+  let cursor = padX;
+  const sourceNodes = visible.map((s) => {
+    const h = Math.max(18, (s.value / total) * usableH);
+    const node = { ...s, y: cursor, h };
+    cursor += h + gap;
+    return node;
+  });
 
-  const targetY = padX + 18;
-  const targetH = H - padX * 2 - 28;
+  const targetY = padX;
+  const targetH = H - padX * 2;
 
   // give each ribbon a slightly different rotation seed for sketchiness
   return (
@@ -58,10 +64,10 @@ export function MemberSankey({
         aria-label={`Money flow into ${targetLabel}`}
       >
         <defs>
-          <linearGradient id="sankey-ribbon" x1="0%" x2="100%" y1="0%" y2="0%">
-            <stop offset="0%" stopColor="var(--money)" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="var(--money)" stopOpacity="0.34" />
-          </linearGradient>
+          <filter id="sankey-rough">
+            <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="1" seed="3" />
+            <feDisplacementMap in="SourceGraphic" scale="2.2" />
+          </filter>
         </defs>
 
         {/* axis labels */}
@@ -89,29 +95,25 @@ export function MemberSankey({
 
         {/* ribbons */}
         {sourceNodes.map((node, i) => {
-          const rh = Math.max(18, (node.value / total) * targetH);
-          const sourceTop = node.y + Math.max(8, node.h * 0.18);
-          const sourceBottom = node.y + node.h - Math.max(8, node.h * 0.18);
-          const targetTop = targetY + sourceNodes.slice(0, i).reduce((sum, item) => sum + (item.value / total) * targetH, 0);
-          const targetBottom = Math.min(targetY + targetH, targetTop + rh);
-          const startX = leftX + sourceW;
-          const endX = rightX;
-          const c1x = startX + (endX - startX) * 0.38;
-          const c2x = startX + (endX - startX) * 0.68;
+          // ribbon thickness scales with value vs total for the target side
+          const rh = Math.max(8, (node.value / total) * (targetH - 8));
+          const ry = targetY + (i / Math.max(visible.length - 1, 1)) * (targetH - rh);
+          const c1x = leftX + (rightX - leftX) * 0.35;
+          const c2x = leftX + (rightX - leftX) * 0.65;
           const path = [
-            `M ${startX} ${sourceTop}`,
-            `C ${c1x} ${sourceTop}, ${c2x} ${targetTop}, ${endX} ${targetTop}`,
-            `L ${endX} ${targetBottom}`,
-            `C ${c2x} ${targetBottom}, ${c1x} ${sourceBottom}, ${startX} ${sourceBottom}`,
-            "Z",
+            `M ${leftX} ${node.y + node.h / 2}`,
+            `C ${c1x} ${node.y + node.h / 2}, ${c2x} ${ry + rh / 2}, ${rightX} ${ry + rh / 2}`,
           ].join(" ");
           return (
             <path
               key={i}
               d={path}
-              fill="url(#sankey-ribbon)"
-              stroke="color-mix(in oklab, var(--money) 45%, transparent)"
-              strokeWidth="0.75"
+              stroke="var(--money)"
+              strokeWidth={Math.max(2, rh * 0.6)}
+              strokeOpacity={0.18 + 0.10 * (i % 2)}
+              fill="none"
+              strokeLinecap="round"
+              filter="url(#sankey-rough)"
             />
           );
         })}
@@ -122,18 +124,20 @@ export function MemberSankey({
             <rect
               x={padX}
               y={node.y}
-              width={sourceW}
+              width={leftX - padX}
               height={node.h}
               fill="var(--paper-2)"
-              stroke="var(--line-soft)"
+              stroke="var(--ink)"
               strokeWidth="1"
-              rx="5"
+              strokeDasharray="3 2"
+              rx="3"
+              filter="url(#sankey-rough)"
             />
             <text
               x={padX + 6}
               y={node.y + node.h / 2 - 2}
               fontFamily="var(--font-inter)"
-              fontSize="11.5"
+              fontSize="11"
               fill="var(--ink)"
             >
               {node.label}
@@ -154,22 +158,23 @@ export function MemberSankey({
         <rect
           x={rightX}
           y={targetY}
-          width={rightW}
+          width={W - rightX - padX}
           height={targetH}
           fill="var(--civic-soft)"
-          stroke="var(--civic-line)"
-          strokeWidth="1"
-          rx="6"
+          stroke="var(--ink)"
+          strokeWidth="1.5"
+          rx="4"
+          filter="url(#sankey-rough)"
         />
         <text
           x={rightX + 10}
           y={targetY + targetH / 2 - 4}
           fontFamily="var(--font-fraunces)"
-          fontSize="13"
+          fontSize="14"
           fontWeight="500"
           fill="var(--ink)"
         >
-          {targetLabel.length > 18 ? `${targetLabel.slice(0, 18)}…` : targetLabel}
+          {targetLabel}
         </text>
         <text
           x={rightX + 10}
@@ -190,7 +195,7 @@ export function MemberSankey({
           fontSize="14"
           fill="var(--money)"
         >
-          ribbon width shows each source's share of receipts
+          ribbon thickness ≈ share of receipts
         </text>
       </svg>
     </div>

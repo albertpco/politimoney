@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Link from "../components/link";
-import { CaveatPanel, ProvenancePanel } from "../components/page-templates";
+import { ProvenancePanel } from "../components/page-templates";
 import {
   SectionCard,
   MetricCard,
@@ -97,25 +97,20 @@ export function MemberDetailPage() {
           subtitle={`${chamber === "S" ? "Senator" : "Representative"} · ${member.partyCode ?? member.party ?? "—"} · ${member.state}${member.district ? `-${member.district}` : ""}`}
         >
           <p className="pt-muted text-sm">
-            This page resolves the current member record by Bioguide ID from the static feed.
+            This profile matches the member's official Bioguide record with campaign finance and vote records where available.
           </p>
         </SectionCard>
 
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-4">
           <ProvenancePanel
             title="Member profile provenance"
             backend="static-feed"
             runId={undefined}
-            freshness="Latest staged member read model"
+            freshness="Latest public member snapshot"
             coverage="Congress member record, FEC-linked funding profile (when available), and recent roll-call positions."
             sourceSystems={["Congress member data", "FEC candidate financials", "House/Senate roll calls"]}
-            notes="Funding totals are linked by candidate and committee identifiers. Vote and contribution records are shown together as context, not as proof of motive."
+            notes="Funding totals are linked by candidate and committee identifiers. Vote and contribution records are shown together for context."
           />
-          <CaveatPanel title="Claim boundary">
-            <p>Receipt totals are campaign/committee records, not payments for a vote.</p>
-            <p>Crosswalks can miss old, renamed, or newly created committees.</p>
-            <p>Use source-linked vote and bill pages before making a policy claim.</p>
-          </CaveatPanel>
         </div>
 
         {funding && (funding.totalReceipts ?? 0) > 0 ? (
@@ -140,26 +135,26 @@ export function MemberDetailPage() {
         ) : (
           <SectionCard title="Funding profile" subtitle="No FEC-linked funding data is available for this member yet.">
             <p className="pt-muted text-sm">
-              This member may not have matched candidate records in the current dataset, or their committees may not have filed yet.
+              This member may not have matched candidate records yet, or their committees may not have filed yet.
             </p>
           </SectionCard>
         )}
 
         {funding?.topDonors?.length ? (
-          <SectionCard title="Top donors" subtitle="Largest named donors in the current read model.">
+          <SectionCard title="Top donors" subtitle="Largest named donors visible in the current public records.">
             <TableExplorer
               columns={["Donor", "Total", "Context"]}
               rows={funding.topDonors.map((donor) => [
                 donor.name,
                 money(donor.amount),
-                donor.employer ? `${donor.employer}${donor.occupation ? ` · ${donor.occupation}` : ""}` : "Current read-model donor total",
+                donor.employer ? `${donor.employer}${donor.occupation ? ` · ${donor.occupation}` : ""}` : "Current donor total",
               ])}
             />
           </SectionCard>
         ) : null}
 
         {funding && (funding.totalReceipts ?? 0) > 0 && funding.sourceBreakdown?.length ? (
-          <SectionCard title="Money flow" subtitle="Receipt sources flowing into the campaign — sketchy diagram, not a precise chart.">
+          <SectionCard title="Money flow" subtitle="Receipt sources flowing into the campaign. Ribbon width shows share of receipts.">
             <MemberSankey
               sources={funding.sourceBreakdown.map((s) => ({ label: s.label, value: s.amount }))}
               targetLabel={member.name}
@@ -168,7 +163,7 @@ export function MemberDetailPage() {
         ) : null}
 
         {recentVotes.length && recentVotes.some((v) => v.startDate) ? (
-          <SectionCard title="Recent activity" subtitle="Vote positions across the most recent congressional sessions.">
+          <SectionCard title="Recent roll-call activity" subtitle="Recent recorded votes from House and Senate roll calls.">
             <MemberTimeline
               votes={recentVotes
                 .filter((v) => v.startDate)
@@ -184,22 +179,20 @@ export function MemberDetailPage() {
         {recentVotes.length ? (
           <SectionCard
             title="Recent voting record"
-            subtitle={`Last ${recentVotes.length} roll-call votes from the ${chamber === "H" ? "House" : "Senate"}.`}
+            subtitle={`Last ${recentVotes.length} recorded roll calls from the ${chamber === "H" ? "House" : "Senate"}. Bills are shown as context when available.`}
           >
             <div className="space-y-4">
               <VoteBreakdownBar title="Vote position summary" segments={buildVoteSegments(voteCounts)} />
               <TableExplorer
-                columns={["Question", "Vote", "Bill", "Result", "Date", ""]}
+                columns={["Roll call", "Vote", "Bill context", "Result", "Date", ""]}
                 rows={recentVotes.map((vote) => [
                   vote.question ?? `Roll call ${vote.voteId}`,
                   vote.voteCast ?? "—",
-                  vote.billId
-                    ? { label: vote.billId, href: `/bills/${encodeURIComponent(vote.billId.toLowerCase())}` }
-                    : "—",
+                  vote.billId ?? "—",
                   vote.result ?? "—",
                   vote.startDate ? formatDate(vote.startDate) : "—",
                   {
-                    label: "Open",
+                    label: "Open roll call",
                     href: `/votes/${chamber === "H" ? "house" : "senate"}/${encodeURIComponent(vote.voteId.toLowerCase())}`,
                   },
                 ])}

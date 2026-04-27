@@ -21,7 +21,7 @@ function PageLayout({
   subtitle,
   children,
   quality = "medium",
-  freshness = "Updated from the static feed",
+  freshness = "Updated from the public data snapshot",
 }: {
   title: string;
   subtitle?: string;
@@ -45,18 +45,15 @@ function CompareHub() {
   return (
     <PageLayout
       title="Compare Landing"
-      subtitle="Run side-by-side accountability comparisons for senators, states, and countries."
+      subtitle="Run side-by-side accountability comparisons for senators and states."
     >
       <SectionCard title="Choose comparison view" subtitle="Compare different topics with consistent metrics.">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <Link className="rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50" href="/compare/senators">
             Compare senators
           </Link>
           <Link className="rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50" href="/compare/states">
             Compare states
-          </Link>
-          <Link className="rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50" href="/compare/countries">
-            Compare countries
           </Link>
         </div>
       </SectionCard>
@@ -213,28 +210,11 @@ function CompareStates() {
   );
 }
 
-function CompareCountries() {
-  return (
-    <PageLayout
-      title="Country Compare"
-      subtitle="Country influence comparisons (FARA registrants and principals) are not yet staged in the static feed."
-      quality="partial"
-    >
-      <SectionCard title="Coming soon" subtitle="Country-level FARA influence data will land in a follow-up feed export.">
-        <p className="pt-muted text-sm">
-          When the FARA aggregate is staged, this view will show registered influence channels with legal-context annotations.
-        </p>
-      </SectionCard>
-    </PageLayout>
-  );
-}
-
 export function ComparePage() {
   const { slug } = useParams<{ slug?: string }>();
   if (!slug) return <CompareHub />;
   if (slug === "senators") return <CompareSenators />;
   if (slug === "states") return <CompareStates />;
-  if (slug === "countries") return <CompareCountries />;
   return (
     <PageLayout title="Compare" subtitle={`No comparison view for "${slug}".`}>
       <SectionCard title="Not found" subtitle="Pick a comparison view from the landing page.">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Link from "../components/link";
-import { CaveatPanel, ProvenancePanel } from "../components/page-templates";
+import { ProvenancePanel } from "../components/page-templates";
 import {
   SectionCard,
   MetricCard,
@@ -67,25 +67,20 @@ export function PacDetailPage() {
             This page resolves committee profiles by committee ID and keeps the funding data on one stable route.
           </p>
         </SectionCard>
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-4">
           <ProvenancePanel
             title="Committee provenance"
             backend="static-feed"
             runId={undefined}
-            freshness="Latest staged committee read model"
+            freshness="Latest public committee snapshot"
             coverage="FEC committee profile, PAC summaries, donor totals, and recipient links when available."
             sourceSystems={["FEC committees", "FEC PAC summaries", "FEC contributions", "candidate-member crosswalk"]}
             notes="Committee labels and issue text come from the loaded public records. Financial totals depend on the latest available filing cycle."
           />
-          <CaveatPanel title="Claim boundary">
-            <p>Committee support is public-record spending or transfers, not proof of coordination unless the filing says so.</p>
-            <p>Recipient links depend on candidate and member crosswalks and may be incomplete.</p>
-            <p>Independent expenditures are outside-spending records and should be read separately from direct receipts.</p>
-          </CaveatPanel>
         </div>
 
         {totalReceipts > 0 ? (
-          <SectionCard title="Financial summary" subtitle="Latest read-model totals for the committee.">
+          <SectionCard title="Financial summary" subtitle="Latest public-record totals for the committee.">
             <div className="grid gap-3 md:grid-cols-3">
               <MetricCard label="Total receipts" value={money(profile.totalReceipts)} delta="classified FEC receipts" period="latest cycle" quality="high" />
               <MetricCard label="Disbursements" value={money(profile.totalDisbursements)} delta="reported committee spending" period="latest cycle" quality="high" />
@@ -98,7 +93,7 @@ export function PacDetailPage() {
                     {
                       label: "Individual contributions",
                       value: profile.totalIndividualContributions ?? 0,
-                      detail: "Receipts attributed to individual donors when the read model can classify them.",
+                      detail: "Receipts attributed to individual donors when the public records can classify them.",
                     },
                     {
                       label: "Other committee contributions",
@@ -129,13 +124,13 @@ export function PacDetailPage() {
         )}
 
         {topDonors.length ? (
-          <SectionCard title="Top donors" subtitle="Largest named donors visible in the current read model.">
+          <SectionCard title="Top donors" subtitle="Largest named donors visible in the current public records.">
             <TableExplorer
               columns={["Donor", "Total", "Context"]}
               rows={topDonors.map((donor) => [
                 donor.donor ?? donor.name ?? "—",
                 money(Number(donor.total ?? donor.amount ?? 0)),
-                donor.employer ? `${donor.employer}${donor.occupation ? ` · ${donor.occupation}` : ""}` : "Current read-model donor total",
+                donor.employer ? `${donor.employer}${donor.occupation ? ` · ${donor.occupation}` : ""}` : "Current public-record donor total",
               ])}
             />
           </SectionCard>

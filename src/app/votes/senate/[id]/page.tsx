@@ -12,6 +12,7 @@ import {
   PartySplitBars,
 } from "@/components/ui-primitives";
 import { buildVoteSegments } from "@/lib/vote-segments";
+import { VoteSplitCards } from "@/components/vote-split-cards";
 import {
   analyzeSenateVoteFundingRepository,
   getDataBackendMode,
@@ -198,7 +199,21 @@ export default async function SenateVotePage({ params }: SenateVotePageProps) {
         subtitle="Vote groups ranked by member count, with receipt buckets from linked FEC candidate financials."
       >
         {analysis?.groups.length ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            <VoteSplitCards
+              groups={analysis.groups.map((g) => ({
+                voteCast: g.voteCast,
+                memberCount: g.memberCount,
+                matchedCandidateCount: g.matchedCandidateCount,
+                totalReceipts: g.totalReceipts,
+              }))}
+              caveat={
+                <span>
+                  Money on each side reflects <b>career receipts</b> of members who voted that way — it shows{" "}
+                  <b>association</b>, not causation. A side raising more from a sector hasn't necessarily voted for that sector.
+                </span>
+              }
+            />
             {analysis.groups.map((group) => (
               <div key={group.voteCast} className="pt-panel space-y-3 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">

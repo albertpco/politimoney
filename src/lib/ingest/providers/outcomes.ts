@@ -5,6 +5,17 @@ import {
   STATE_NAME_TO_CODE,
   US_STATES,
 } from "@/lib/state-metadata";
+import {
+  STATE_GDP_FIXTURE,
+  STATE_GDP_SOURCE_YEAR,
+} from "@/lib/ingest/providers/state-gdp-fixture";
+import {
+  STATE_ECONOMY_FIXTURE,
+  STATE_ECONOMY_SOURCE_YEAR,
+  STATE_FEDERAL_BALANCE_SOURCE_YEAR,
+  STATE_TAX_BURDEN_SOURCE_YEAR,
+  STATE_UNEMPLOYMENT_SOURCE_YEAR,
+} from "@/lib/ingest/providers/state-economy-fixture";
 
 type CensusArrayResponse = string[][];
 
@@ -215,20 +226,44 @@ export async function ingestStateOutcomes({
     );
   }
 
-  const states: StateOutcome[] = US_STATES.map((state) => ({
-    stateCode: state.code,
-    stateName: state.name,
-    population: populationByCode.get(state.code),
-    childPovertyPct: childPovertyByCode.get(state.code),
-    fertilityRatePer1kWomen: fertilityByCode.get(state.code),
-    suicideRatePer100k: suicideByCode.get(state.code),
-    childMortalityPer1k: childMortalityByCode.get(state.code),
-    sourceYears: {
-      census: year,
-      cdcSuicide: latestSuicideYear,
-      cdcChildMortalityPeriodId: childMortalityPeriodId,
-    },
-  }));
+  const states: StateOutcome[] = US_STATES.map((state) => {
+    const population = populationByCode.get(state.code);
+    const gdp = STATE_GDP_FIXTURE[state.code];
+    const gdpUsdMillions = gdp?.gdpUsdMillions;
+    const gdpPerCapitaUsd =
+      gdpUsdMillions && population
+        ? Math.round((gdpUsdMillions * 1_000_000) / population)
+        : undefined;
+    const econ = STATE_ECONOMY_FIXTURE[state.code];
+    return {
+      stateCode: state.code,
+      stateName: state.name,
+      population,
+      childPovertyPct: childPovertyByCode.get(state.code),
+      fertilityRatePer1kWomen: fertilityByCode.get(state.code),
+      suicideRatePer100k: suicideByCode.get(state.code),
+      childMortalityPer1k: childMortalityByCode.get(state.code),
+      gdpUsdMillions,
+      gdpPerCapitaUsd,
+      gdpGrowthPct: gdp?.gdpGrowthPct,
+      medianHouseholdIncomeUsd: econ?.medianHouseholdIncomeUsd,
+      medianAgeYears: econ?.medianAgeYears,
+      bachelorsOrHigherPct: econ?.bachelorsOrHigherPct,
+      unemploymentRatePct: econ?.unemploymentRatePct,
+      stateLocalTaxBurdenPct: econ?.stateLocalTaxBurdenPct,
+      federalBalancePerCapitaUsd: econ?.federalBalancePerCapitaUsd,
+      sourceYears: {
+        census: year,
+        cdcSuicide: latestSuicideYear,
+        cdcChildMortalityPeriodId: childMortalityPeriodId,
+        beaGdp: STATE_GDP_SOURCE_YEAR,
+        censusEconomy: STATE_ECONOMY_SOURCE_YEAR,
+        blsUnemployment: STATE_UNEMPLOYMENT_SOURCE_YEAR,
+        taxFoundation: STATE_TAX_BURDEN_SOURCE_YEAR,
+        federalBalance: STATE_FEDERAL_BALANCE_SOURCE_YEAR,
+      },
+    };
+  });
 
   const statesWithAnyMetric = states.filter(
     (state) =>
@@ -236,7 +271,8 @@ export async function ingestStateOutcomes({
       state.childPovertyPct !== undefined ||
       state.fertilityRatePer1kWomen !== undefined ||
       state.suicideRatePer100k !== undefined ||
-      state.childMortalityPer1k !== undefined,
+      state.childMortalityPer1k !== undefined ||
+      state.gdpUsdMillions !== undefined,
   ).length;
 
   if (statesWithAnyMetric < 50) {

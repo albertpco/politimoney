@@ -1,6 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import Link from "./link";
+import {
+  AiContextProvider,
+  buildPromptFromContext,
+  useAiContextValue,
+} from "../lib/ai-context";
 
 const NAV_ITEMS = [
   { href: "/search", label: "Search" },
@@ -212,15 +217,11 @@ function TopNav() {
   );
 }
 
-function aiPromptForPage(pathname: string) {
+function useAiPromptForPage() {
+  const pathname = usePathname();
+  const ctx = useAiContextValue();
   const url = typeof window === "undefined" ? pathname : window.location.href;
-  const section = pathname.split("/").filter(Boolean)[0] ?? "home";
-  return [
-    `I am reading this PolitiMoney ${section} page: ${url}`,
-    "Help me understand what the public records on this page show.",
-    "Focus on the named people, committees, votes, trades, source links, and dates.",
-    "Do not assume motive. Separate what the records show from what still needs verification.",
-  ].join("\n");
+  return buildPromptFromContext(pathname, url, ctx);
 }
 
 const AI_TOOL_ICON: Record<string, ReactNode> = {
@@ -248,30 +249,93 @@ const AI_TOOL_ICON: Record<string, ReactNode> = {
       />
     </svg>
   ),
+  Copy: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  ),
+  Copied: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  ),
 };
 
 function AiDock() {
-  const pathname = usePathname();
-  const encodedPrompt = encodeURIComponent(aiPromptForPage(pathname));
-  const tools = [
-    { label: "ChatGPT", href: `https://chatgpt.com/?q=${encodedPrompt}` },
-    { label: "Claude", href: `https://claude.ai/new?q=${encodedPrompt}` },
-    { label: "Gemini", href: `https://gemini.google.com/app?prompt=${encodedPrompt}` },
+  const prompt = useAiPromptForPage();
+  const encodedPrompt = encodeURIComponent(prompt);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(prompt);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = prompt;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const linkTools = [
+    {
+      label: "ChatGPT",
+      href: `https://chatgpt.com/?q=${encodedPrompt}`,
+      title: "Open this page with ChatGPT (prompt is pre-filled)",
+    },
+    {
+      label: "Claude",
+      href: `https://claude.ai/new?q=${encodedPrompt}`,
+      title: "Open this page with Claude (prompt is pre-filled)",
+    },
+    {
+      label: "Gemini",
+      href: "https://gemini.google.com/app",
+      title: "Open Gemini — use the Copy button first to grab the prompt",
+    },
   ];
 
   return (
     <aside className="ai-dock" aria-label="Open this page with an AI assistant">
-      <span className="ai-dock-title">Open with</span>
+      <div className="ai-dock-header">
+        <span className="ai-dock-title">Open with</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="ai-dock-copy"
+          aria-label="Copy prompt to clipboard"
+          title="Copy prompt — paste into any model"
+        >
+          {copied ? AI_TOOL_ICON.Copied : AI_TOOL_ICON.Copy}
+          <span>{copied ? "Copied" : "Copy"}</span>
+        </button>
+      </div>
       <div className="ai-dock-actions">
-        {tools.map((tool) => (
+        {linkTools.map((tool) => (
           <a
             key={tool.label}
             href={tool.href}
             target="_blank"
             rel="noopener noreferrer"
             className="ai-dock-button"
-            aria-label={`Open this page with ${tool.label}`}
-            title={`Open this page with ${tool.label}`}
+            aria-label={tool.title}
+            title={tool.title}
           >
             {AI_TOOL_ICON[tool.label]}
             <span>{tool.label}</span>
@@ -301,7 +365,7 @@ function ContextFilterBar() {
 
 export function SiteShell({ children }: { children: ReactNode }) {
   return (
-    <>
+    <AiContextProvider>
       <TopNav />
       <div className="mx-auto w-full max-w-7xl px-4 py-4">
         <Breadcrumbs />
@@ -321,6 +385,6 @@ export function SiteShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </footer>
-    </>
+    </AiContextProvider>
   );
 }

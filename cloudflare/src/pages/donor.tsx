@@ -13,6 +13,7 @@ import {
 } from "../components/ui-primitives";
 import { fmtCompact, donorTypeLabel } from "../lib/format";
 import { loadDonor, type DonorDetail } from "../lib/feed";
+import { useSetAiContext } from "../lib/ai-context";
 
 const evidenceLinks = [
   { label: "FEC.gov", href: "https://www.fec.gov" },
@@ -37,6 +38,29 @@ export function DonorDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useSetAiContext(
+    data
+      ? {
+          kind: "Donor",
+          name: data.donor.donor,
+          facts: [
+            `Donor type: ${donorTypeLabel(data.donor.donorType)}.`,
+            data.donor.donorEmployer ? `Employer: ${data.donor.donorEmployer}.` : null,
+            data.donor.donorState ? `State: ${data.donor.donorState}.` : null,
+            data.donor.totalContributed
+              ? `Total contributed: $${Math.round(data.donor.totalContributed).toLocaleString()}.`
+              : null,
+            data.donor.contributionRows
+              ? `Itemized contribution rows: ${data.donor.contributionRows.toLocaleString()}.`
+              : null,
+            data.donor.recipientCount
+              ? `Distinct recipients: ${data.donor.recipientCount}.`
+              : null,
+          ].filter(Boolean) as string[],
+        }
+      : null,
+  );
 
   if (error) {
     return (

@@ -9,6 +9,7 @@ import {
 import { SectionCard, TableExplorer } from "../components/ui-primitives";
 import { loadBill, type BillDetail } from "../lib/feed";
 import { congressBillUrl } from "../lib/congress-links";
+import { useSetAiContext } from "../lib/ai-context";
 
 function billLabel(billType: string, billNumber: string): string {
   return `${billType.toUpperCase()} ${billNumber}`;
@@ -37,6 +38,28 @@ export function BillDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useSetAiContext(
+    data
+      ? {
+          kind: "Bill",
+          name: `${data.bill.billType.toUpperCase()} ${data.bill.billNumber}${data.bill.title ? ` — ${data.bill.title}` : ""}`,
+          id: data.bill.id,
+          facts: [
+            `Congress: ${data.bill.congress}.`,
+            data.bill.sponsor
+              ? `Sponsor: ${data.bill.sponsor}${data.bill.sponsorParty ? ` (${data.bill.sponsorParty}${data.bill.sponsorState ? `-${data.bill.sponsorState}` : ""})` : ""}.`
+              : null,
+            data.bill.status || data.bill.latestActionText
+              ? `Latest action: ${data.bill.status ?? data.bill.latestActionText}${data.bill.latestActionDate ? ` (${data.bill.latestActionDate})` : ""}.`
+              : null,
+            data.linkedVotes?.length
+              ? `Linked roll-call votes on this page: ${data.linkedVotes.length}.`
+              : "No linked roll-call votes in this snapshot.",
+          ].filter(Boolean) as string[],
+        }
+      : null,
+  );
 
   if (error) {
     return (

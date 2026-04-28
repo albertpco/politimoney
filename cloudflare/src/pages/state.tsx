@@ -15,6 +15,7 @@ import {
   type StateDashboardRow,
 } from "../lib/state-outcomes";
 import { fetchJson, type MemberRecord } from "../lib/feed";
+import { useSetAiContext } from "../lib/ai-context";
 
 function normalizeStateId(rawId: string): string | null {
   const trimmed = rawId.trim();
@@ -113,6 +114,36 @@ export function StateDetailPage() {
     };
   }, []);
 
+  const stateRows = !loading ? getStateDashboardRowsFromOutcomes(outcomes) : [];
+  const stateEntity: StateDashboardRow | undefined = stateCode
+    ? stateRows.find((r) => r.code.toUpperCase() === stateCode)
+    : undefined;
+
+  useSetAiContext(
+    stateEntity
+      ? {
+          kind: "State",
+          name: stateEntity.name,
+          id: stateEntity.code,
+          facts: [
+            stateEntity.gdp && stateEntity.gdp !== "—" ? `GDP: ${stateEntity.gdp}.` : null,
+            stateEntity.gdpGrowth && stateEntity.gdpGrowth !== "—"
+              ? `Real GDP growth y/y: ${stateEntity.gdpGrowth}.`
+              : null,
+            stateEntity.medianIncome && stateEntity.medianIncome !== "—"
+              ? `Median household income: ${stateEntity.medianIncome}.`
+              : null,
+            stateEntity.unemployment && stateEntity.unemployment !== "—"
+              ? `Unemployment rate: ${stateEntity.unemployment}.`
+              : null,
+            stateEntity.population && stateEntity.population !== "—"
+              ? `Population: ${stateEntity.population}.`
+              : null,
+          ].filter(Boolean) as string[],
+        }
+      : null,
+  );
+
   if (!stateCode) {
     return (
       <main>
@@ -124,10 +155,6 @@ export function StateDetailPage() {
   }
   if (loading) return <p className="pt-muted">Loading state record…</p>;
 
-  const stateRows = getStateDashboardRowsFromOutcomes(outcomes);
-  const stateEntity: StateDashboardRow | undefined = stateRows.find(
-    (r) => r.code.toUpperCase() === stateCode,
-  );
   if (!stateEntity) {
     return (
       <main>

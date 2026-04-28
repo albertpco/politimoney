@@ -12,6 +12,7 @@ import {
 import { buildVoteSegments } from "../lib/vote-segments";
 import { loadHouseVote, loadIndex, loadSenateVote, type VoteDetail } from "../lib/feed";
 import { congressBillUrl } from "../lib/congress-links";
+import { useSetAiContext } from "../lib/ai-context";
 
 function formatDate(value?: string | Date): string {
   if (!value) return "—";
@@ -67,6 +68,27 @@ export function VoteDetailPage({ chamber }: { chamber: "H" | "S" }) {
       cancelled = true;
     };
   }, [id, chamber]);
+
+  useSetAiContext(
+    data
+      ? {
+          kind: chamber === "H" ? "House vote" : "Senate vote",
+          name:
+            data.vote.question ??
+            `${chamber === "H" ? "House" : "Senate"} roll call ${data.vote.rollCallNumber ?? data.vote.voteId}`,
+          id: data.vote.voteId,
+          facts: [
+            `${chamber === "H" ? "House" : "Senate"} roll call ${data.vote.rollCallNumber ?? data.vote.voteId}${data.vote.congress ? `, ${data.vote.congress}th Congress` : ""}.`,
+            data.vote.startDate ? `Vote date: ${data.vote.startDate}.` : null,
+            data.vote.result ? `Result: ${data.vote.result}.` : null,
+            data.vote.billId ? `Linked bill: ${data.vote.billId.toUpperCase()}.` : null,
+            data.memberVotes?.length
+              ? `Members recorded on this roll call: ${data.memberVotes.length}.`
+              : null,
+          ].filter(Boolean) as string[],
+        }
+      : null,
+  );
 
   if (error) {
     return (

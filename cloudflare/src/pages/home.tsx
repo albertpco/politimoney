@@ -9,7 +9,6 @@ import {
 } from "../components/ui-primitives";
 import {
   CompactRanking,
-  AiHandoffPanel,
   FactCheckPanel,
   QueryHero,
   SignalTile,
@@ -51,18 +50,6 @@ function formatMoney(value: number | undefined): string {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function buildLlmHandoffPrompt(): string {
-  return [
-    "I am using PolitiMoney, an open public-record intelligence tool for American government.",
-    "Help me inspect the evidence without assuming motive or cause and effect.",
-    "Start with these questions:",
-    "1. Who funds the official, committee, bill, or vote group I am looking at?",
-    "2. Which records support the claim, and what source links should I verify?",
-    "3. What does the data show, and what does it not prove?",
-    "4. What comparison or ranking should I run next to avoid cherry-picking?",
-  ].join("\n");
 }
 
 const STATE_MAP_METRICS = [
@@ -233,8 +220,6 @@ export function HomePage() {
             ]}
           />
         </section>
-
-        <AiHandoffPanel prompt={buildLlmHandoffPrompt()} />
 
         {topMembers.length > 0 && topMembers.some((m) => m.totalReceipts > 0) ? (
           <section className="grid gap-4 xl:grid-cols-2">

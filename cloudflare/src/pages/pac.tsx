@@ -9,6 +9,7 @@ import {
   TableExplorer,
 } from "../components/ui-primitives";
 import { loadPac, type PacDetail } from "../lib/feed";
+import { useSetAiContext } from "../lib/ai-context";
 
 function money(value: number | undefined): string {
   if (!value || !Number.isFinite(value)) return "$0";
@@ -38,6 +39,36 @@ export function PacDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  const profileForCtx = data?.profile;
+
+  useSetAiContext(
+    profileForCtx
+      ? {
+          kind: "PAC / Committee",
+          name: profileForCtx.label ?? profileForCtx.entityId ?? id ?? "Committee",
+          id: profileForCtx.entityId ?? profileForCtx.committeeIds?.[0] ?? id,
+          facts: [
+            profileForCtx.issue ? `Issue: ${profileForCtx.issue}.` : null,
+            profileForCtx.totalReceipts
+              ? `Total receipts (latest cycle): $${Math.round(profileForCtx.totalReceipts).toLocaleString()}.`
+              : null,
+            profileForCtx.totalDisbursements
+              ? `Total disbursements: $${Math.round(profileForCtx.totalDisbursements).toLocaleString()}.`
+              : null,
+            profileForCtx.cashOnHand
+              ? `Cash on hand: $${Math.round(profileForCtx.cashOnHand).toLocaleString()}.`
+              : null,
+            profileForCtx.recipients?.length
+              ? `Top recipients listed on page: ${profileForCtx.recipients.length}.`
+              : null,
+            profileForCtx.topDonors?.length
+              ? `Top donors listed on page: ${profileForCtx.topDonors.length}.`
+              : null,
+          ].filter(Boolean) as string[],
+        }
+      : null,
+  );
 
   if (error) {
     return (

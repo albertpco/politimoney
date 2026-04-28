@@ -14,6 +14,7 @@ import { PeerRail } from "../components/design-primitives";
 import { MemberSankey } from "../components/member-sankey";
 import { MemberTimeline } from "../components/member-timeline";
 import { loadMember, type MemberDetail } from "../lib/feed";
+import { useSetAiContext } from "../lib/ai-context";
 
 function formatDate(value?: string | Date | null): string {
   if (!value) return "—";
@@ -63,6 +64,31 @@ export function MemberDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useSetAiContext(
+    data
+      ? {
+          kind: "Member",
+          name: data.member.name,
+          id: data.member.bioguideId,
+          facts: [
+            `${data.member.chamber === "S" ? "Senator" : "Representative"} from ${data.member.state}${data.member.district ? `-${data.member.district}` : ""}.`,
+            data.member.party || data.member.partyCode
+              ? `Party: ${data.member.partyCode ?? data.member.party}.`
+              : null,
+            data.funding?.totalReceipts
+              ? `Total campaign receipts (latest cycle): $${Math.round(data.funding.totalReceipts).toLocaleString()}.`
+              : null,
+            data.funding?.totalDisbursements
+              ? `Total disbursements: $${Math.round(data.funding.totalDisbursements).toLocaleString()}.`
+              : null,
+            data.recentVotes?.length
+              ? `Recent recorded votes on this page: ${data.recentVotes.length}.`
+              : null,
+          ].filter(Boolean) as string[],
+        }
+      : null,
+  );
 
   if (error) {
     return (

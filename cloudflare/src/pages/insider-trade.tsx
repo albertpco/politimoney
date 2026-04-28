@@ -10,6 +10,7 @@ import {
   UtilityRail,
 } from "../components/ui-primitives";
 import { loadCongressTrade, type CongressTradeDetail } from "../lib/feed";
+import { useSetAiContext } from "../lib/ai-context";
 
 function transactionLabel(t: string | undefined): string {
   if (!t) return "—";
@@ -39,6 +40,25 @@ export function CongressTradeDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useSetAiContext(
+    data
+      ? {
+          kind: "Congressional trade disclosure",
+          name: `${data.trade.ticker ?? data.trade.assetName ?? "Trade"} · ${transactionLabel(data.trade.transactionType ?? data.trade.transactionLabel)}`,
+          facts: [
+            data.trade.memberName ? `Filer: ${data.trade.memberName}.` : null,
+            data.trade.chamber
+              ? `Chamber: ${data.trade.chamber === "S" ? "Senate" : "House"}${data.trade.state ? ` · ${data.trade.state}${data.trade.district ? `-${data.trade.district}` : ""}` : ""}.`
+              : null,
+            data.trade.assetName ? `Asset: ${data.trade.assetName}.` : null,
+            data.trade.amountRange ? `Reported amount range: ${data.trade.amountRange}.` : null,
+            data.trade.transactionDate ? `Transaction date: ${data.trade.transactionDate}.` : null,
+            data.trade.notificationDate ? `Notification date: ${data.trade.notificationDate}.` : null,
+          ].filter(Boolean) as string[],
+        }
+      : null,
+  );
 
   if (error) {
     return (

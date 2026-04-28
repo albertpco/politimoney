@@ -516,15 +516,42 @@ table.t .name { font-weight: 500; }
   box-shadow: 0 6px 18px rgba(20,17,13,0.12), 0 1px 0 rgba(20,17,13,0.05);
   color: var(--ink);
 }
+.ai-dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 2px 6px;
+}
 .ai-dock-title {
   display: block;
-  margin: 0 2px 6px;
   color: var(--ink-3);
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+.ai-dock-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ai-dock-copy:hover {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--paper-2);
+}
+.ai-dock-copy svg { display: block; }
 .ai-dock-actions { display: flex; gap: 6px; }
 .ai-dock-button {
   display: inline-flex; align-items: center; gap: 6px;

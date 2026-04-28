@@ -1,10 +1,16 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { fetchJson, fetchText } from "@/lib/ingest/http";
 import type {
   FecCommittee,
   InsiderTrade,
   InsiderTradeSummary,
   ContractorProfile,
+  LobbyingFiling,
 } from "@/lib/ingest/types";
+
+const CIK_CACHE_DIR = path.join(process.cwd(), "data", "ingest", "cache");
+const CIK_CACHE_FILE = path.join(CIK_CACHE_DIR, "sec-cik-resolutions.json");
 
 const SEC_USER_AGENT = "politimoney/0.1 albpcohen@gmail.com";
 
@@ -466,6 +472,59 @@ async function fetchTopInsiderBuyers(
 }
 
 // ---------------------------------------------------------------------------
+// Concurrency helper (inline pMap)
+// ---------------------------------------------------------------------------
+
+async function pMap<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+
+  const workers: Promise<void>[] = [];
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  for (let w = 0; w < workerCount; w++) {
+    workers.push(
+      (async () => {
+        while (true) {
+          const i = cursor++;
+          if (i >= items.length) return;
+          results[i] = await fn(items[i], i);
+        }
+      })(),
+    );
+  }
+  await Promise.all(workers);
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// CIK resolution disk cache
+// ---------------------------------------------------------------------------
+
+type CikCache = Record<string, EdgarCompanyMatch | null>;
+
+async function loadCikCache(): Promise<CikCache> {
+  try {
+    const raw = await readFile(CIK_CACHE_FILE, "utf8");
+    return JSON.parse(raw) as CikCache;
+  } catch {
+    return {};
+  }
+}
+
+async function saveCikCache(cache: CikCache): Promise<void> {
+  try {
+    await mkdir(CIK_CACHE_DIR, { recursive: true });
+    await writeFile(CIK_CACHE_FILE, JSON.stringify(cache, null, 2), "utf8");
+  } catch {
+    // best-effort cache; ignore write failures
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
 
@@ -478,16 +537,35 @@ export type SecInsiderIngestResult = {
 export async function ingestSecInsiderData({
   committees = [],
   contractors = [],
+  lobbyingFilings = [],
   maxCompanies = 30,
   filingsPerCompany = 10,
   includeTopBuyers = true,
+  fullUniverse = process.env.INGEST_INSIDER_FULL === "true",
+  resolveConcurrency = 5,
+  fetchConcurrency = 5,
 }: {
   committees?: FecCommittee[];
   contractors?: ContractorProfile[];
+  lobbyingFilings?: LobbyingFiling[];
   maxCompanies?: number;
   filingsPerCompany?: number;
   includeTopBuyers?: boolean;
+  fullUniverse?: boolean;
+  resolveConcurrency?: number;
+  fetchConcurrency?: number;
 } = {}): Promise<SecInsiderIngestResult> {
+  if (fullUniverse) {
+    return runFullUniverse({
+      committees,
+      contractors,
+      lobbyingFilings,
+      filingsPerCompany,
+      resolveConcurrency,
+      fetchConcurrency,
+    });
+  }
+
   const warnings: string[] = [];
   const allTrades: InsiderTrade[] = [];
 
@@ -571,6 +649,135 @@ export async function ingestSecInsiderData({
   const contractorLinked = summaries.filter((s) => s.contractorName).length;
   console.log(
     `[sec-insider] ${summaries.length} company summaries: ${fecLinked} FEC-linked, ${contractorLinked} contractor-linked`,
+  );
+
+  return { trades: allTrades, summaries, warnings };
+}
+
+async function runFullUniverse({
+  committees,
+  contractors,
+  lobbyingFilings,
+  filingsPerCompany,
+  resolveConcurrency,
+  fetchConcurrency,
+}: {
+  committees: FecCommittee[];
+  contractors: ContractorProfile[];
+  lobbyingFilings: LobbyingFiling[];
+  filingsPerCompany: number;
+  resolveConcurrency: number;
+  fetchConcurrency: number;
+}): Promise<SecInsiderIngestResult> {
+  const warnings: string[] = [];
+  const allTrades: InsiderTrade[] = [];
+
+  const byNormalized = new Map<string, string>();
+  const addName = (raw: string | undefined | null) => {
+    if (!raw) return;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const norm = normalizeCompanyName(trimmed);
+    if (!norm) return;
+    if (!byNormalized.has(norm)) byNormalized.set(norm, trimmed);
+  };
+
+  for (const committee of committees) addName(committee.connectedOrgName);
+  for (const contractor of contractors) addName(contractor.recipientName);
+  for (const filing of lobbyingFilings) {
+    addName(filing.clientName);
+    addName(filing.registrantName);
+  }
+
+  const candidates = [...byNormalized.entries()].map(([norm, display]) => ({
+    norm,
+    display,
+  }));
+
+  console.log(
+    `[sec-insider:full] Aggregated ${candidates.length} unique company names ` +
+      `(${committees.length} committees + ${contractors.length} contractors + ${lobbyingFilings.length} lobbying filings)`,
+  );
+
+  const cache = await loadCikCache();
+  const initialCacheSize = Object.keys(cache).length;
+  let cacheHits = 0;
+  let resolveProgress = 0;
+
+  const resolved = await pMap(candidates, resolveConcurrency, async ({ norm, display }) => {
+    if (Object.prototype.hasOwnProperty.call(cache, norm)) {
+      cacheHits++;
+      const counter = ++resolveProgress;
+      if (counter % 50 === 0) {
+        console.log(
+          `[sec-insider:full] resolved ${counter}/${candidates.length} names ` +
+            `(cache hits: ${cacheHits})`,
+        );
+      }
+      return cache[norm];
+    }
+    await delay();
+    const match = await searchCompanyByName(display);
+    cache[norm] = match;
+    const counter = ++resolveProgress;
+    if (counter % 50 === 0) {
+      console.log(
+        `[sec-insider:full] resolved ${counter}/${candidates.length} names ` +
+          `(cache hits: ${cacheHits})`,
+      );
+    }
+    return match;
+  });
+
+  await saveCikCache(cache);
+  const newlyCached = Object.keys(cache).length - initialCacheSize;
+
+  const cikMap = new Map<string, EdgarCompanyMatch>();
+  for (const match of resolved) {
+    if (match) cikMap.set(match.cik, match);
+  }
+  for (const market of DEFAULT_MARKET_CIKS) {
+    if (!cikMap.has(market.cik)) cikMap.set(market.cik, market);
+  }
+  const companyTargets = [...cikMap.values()];
+
+  console.log(
+    `[sec-insider:full] Resolved ${cikMap.size} unique CIKs ` +
+      `(cache hits: ${cacheHits}, newly cached: ${newlyCached})`,
+  );
+
+  let fetchProgress = 0;
+  let runningTradeTotal = 0;
+
+  const fetchResults = await pMap(companyTargets, fetchConcurrency, async (company) => {
+    await delay();
+    const result = await fetchForm4Trades(company.cik, filingsPerCompany);
+    runningTradeTotal += result.trades.length;
+    const counter = ++fetchProgress;
+    if (counter % 50 === 0 || counter === companyTargets.length) {
+      console.log(
+        `[sec-insider:full] ${counter}/${companyTargets.length} companies, ` +
+          `${runningTradeTotal} trades so far`,
+      );
+    }
+    return result;
+  });
+
+  for (const result of fetchResults) {
+    allTrades.push(...result.trades);
+    warnings.push(...result.warnings);
+  }
+
+  console.log(
+    `[sec-insider:full] Fetched ${allTrades.length} insider trades from ${companyTargets.length} companies`,
+  );
+
+  const summaries = buildInsiderTradeSummaries(allTrades, committees, contractors);
+
+  const fecLinked = summaries.filter((s) => s.fecCommitteeId).length;
+  const contractorLinked = summaries.filter((s) => s.contractorName).length;
+  console.log(
+    `[sec-insider:full] ${summaries.length} company summaries: ${fecLinked} FEC-linked, ${contractorLinked} contractor-linked`,
   );
 
   return { trades: allTrades, summaries, warnings };

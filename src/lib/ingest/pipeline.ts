@@ -34,7 +34,7 @@ import {
   saveUsaSpendingArtifacts,
   saveVoteFundingSummaries,
 } from "@/lib/ingest/storage";
-import type { CycleDetail, FecCandidate, FecCommittee, IngestArtifacts, IngestRunSummary, SourceName, SourceRunStatus } from "@/lib/ingest/types";
+import type { CycleDetail, FecCandidate, FecCommittee, IngestArtifacts, IngestRunSummary, LobbyingFiling, SourceName, SourceRunStatus } from "@/lib/ingest/types";
 
 function sourceFailure(source: SourceName, error: unknown): SourceRunStatus {
   return {
@@ -378,16 +378,61 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
     );
   }
 
+  const insiderFullUniverse = process.env.INGEST_INSIDER_FULL === "true";
+
+  let ldaStatus: SourceRunStatus | undefined;
+  const ldaWarnings: string[] = [];
+  let ldaFilingsForSec: LobbyingFiling[] = [];
+
+  const runLda = async () => {
+    try {
+      console.log("[pipeline] fetching Senate LDA lobbying data");
+      const ldaResult = await ingestLdaData({
+        year: config.cycles[0],
+        committees: artifacts.fec.committees,
+        members: artifacts.congress.members,
+        contractors: usaspendingContractors,
+      });
+      await saveLobbyingArtifacts(ldaResult.filings, ldaResult.contributions, ldaResult.clients);
+      ldaWarnings.push(...ldaResult.warnings);
+      ldaStatus = sourceSuccess(
+        ldaResult.filings.length + ldaResult.contributions.length + ldaResult.clients.length,
+        ldaWarnings,
+      );
+      ldaFilingsForSec = ldaResult.filings;
+      console.log(
+        `[pipeline] LDA: ${ldaResult.filings.length} filings, ${ldaResult.contributions.length} contributions, ${ldaResult.clients.length} clients`,
+      );
+    } catch (error) {
+      ldaStatus = sourceFailure("lda", error);
+    }
+  };
+
+  if (insiderFullUniverse) {
+    await runLda();
+  }
+
   // --- SEC EDGAR insider trading (Form 4 filings) ---
   let secStatus: SourceRunStatus;
   const secWarnings: string[] = [];
   try {
-    console.log("[pipeline] fetching SEC EDGAR insider trade data");
+    console.log(
+      insiderFullUniverse
+        ? "[pipeline] fetching SEC EDGAR insider trade data (full universe)"
+        : "[pipeline] fetching SEC EDGAR insider trade data",
+    );
     const secResult = await ingestSecInsiderData({
       committees: artifacts.fec.committees,
+      ...(insiderFullUniverse
+        ? {
+            contractors: usaspendingContractors,
+            lobbyingFilings: ldaFilingsForSec,
+          }
+        : {}),
       maxCompanies: 30,
       filingsPerCompany: 10,
       includeTopBuyers: true,
+      fullUniverse: insiderFullUniverse,
     });
     await saveInsiderTradeArtifacts(secResult.trades, secResult.summaries);
     secWarnings.push(...secResult.warnings);
@@ -402,29 +447,10 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
     secStatus = sourceFailure("sec", error);
   }
 
-  // --- LDA: Senate lobbying disclosures (uses FEC committees, members, contractors for crosswalk) ---
-  let ldaStatus: SourceRunStatus;
-  const ldaWarnings: string[] = [];
-  try {
-    console.log("[pipeline] fetching Senate LDA lobbying data");
-    const ldaResult = await ingestLdaData({
-      year: config.cycles[0],
-      committees: artifacts.fec.committees,
-      members: artifacts.congress.members,
-      contractors: usaspendingContractors,
-    });
-    await saveLobbyingArtifacts(ldaResult.filings, ldaResult.contributions, ldaResult.clients);
-    ldaWarnings.push(...ldaResult.warnings);
-    ldaStatus = sourceSuccess(
-      ldaResult.filings.length + ldaResult.contributions.length + ldaResult.clients.length,
-      ldaWarnings,
-    );
-    console.log(
-      `[pipeline] LDA: ${ldaResult.filings.length} filings, ${ldaResult.contributions.length} contributions, ${ldaResult.clients.length} clients`,
-    );
-  } catch (error) {
-    ldaStatus = sourceFailure("lda", error);
+  if (!insiderFullUniverse) {
+    await runLda();
   }
+  const ldaStatusFinal: SourceRunStatus = ldaStatus ?? sourceFailure("lda", new Error("LDA stage skipped"));
 
   const summary: IngestRunSummary = {
     runId,
@@ -442,7 +468,7 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
       outcomes: outcomesStatus,
       usaspending: usaspendingStatus,
       sec: secStatus,
-      lda: ldaStatus,
+      lda: ldaStatusFinal,
     },
     totals: {
       candidates: artifacts.fec.candidates.length,
@@ -475,7 +501,7 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
       ...secWarnings,
       ...(secStatus.error ? [secStatus.error] : []),
       ...ldaWarnings,
-      ...(ldaStatus.error ? [ldaStatus.error] : []),
+      ...(ldaStatusFinal.error ? [ldaStatusFinal.error] : []),
     ],
   };
 

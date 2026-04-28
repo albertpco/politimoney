@@ -520,6 +520,31 @@ export type InsiderTradeSummary = {
   contractorName?: string;
 };
 
+// --- SEC EDGAR corporate filings (non-Form-4) types ---
+
+export type SecCorporateFilingType =
+  | "SC 13D"
+  | "SC 13D/A"
+  | "8-K"
+  | "NT 10-K"
+  | "NT 10-Q"
+  | "S-3"
+  | "S-3/A"
+  | "424B5";
+
+export type SecCorporateFiling = {
+  cik: string;
+  ticker: string;
+  companyName: string;
+  form: SecCorporateFilingType;
+  filingDate: string;
+  accessionNumber: string;
+  primaryDocumentUrl: string;
+  items?: string[];
+  filerName?: string;
+  filerCik?: string;
+};
+
 export type IngestArtifacts = {
   fec: {
     candidates: FecCandidate[];

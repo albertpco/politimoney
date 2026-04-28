@@ -24,6 +24,7 @@
     "fetch:lobbying": "tsx src/scripts/fetch-lobbying.ts",
     "fetch:efilings": "tsx src/scripts/fetch-efilings.ts",
     "fetch:insider-trades": "tsx src/scripts/fetch-insider-trades.ts",
+    "fetch:market-data": "tsx src/scripts/fetch-market-data.ts",
     "feed:export": "tsx src/scripts/export-public-feed.ts",
     "feed:validate:beta": "tsx src/scripts/validate-public-feed.ts",
     "beta:refresh": "npm run ingest && npm run ingest:validate && npm run cf:build:beta && npm run feed:validate:beta",

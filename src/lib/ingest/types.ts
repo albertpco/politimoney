@@ -520,6 +520,46 @@ export type InsiderTradeSummary = {
   contractorName?: string;
 };
 
+// --- Dormant market-data scaffolding types (FINRA short interest, FTD, Yahoo quotes) ---
+
+export type ShortInterestRecord = {
+  ticker: string;
+  reportDate: string;
+  shortInterest: number;
+  averageDailyVolume: number;
+  daysToCover: number | null;
+  deltaVsPrior?: number;
+  source: "finra";
+};
+
+export type FtdRecord = {
+  ticker: string;
+  cusip?: string;
+  settlementDate: string;
+  failedShares: number;
+  pricePerShare: number;
+  onThresholdList: boolean;
+  source: "sec-ftd";
+};
+
+export type QuoteRecord = {
+  ticker: string;
+  price: number | null;
+  previousClose: number | null;
+  fiftyTwoWeekLow: number | null;
+  fiftyTwoWeekHigh: number | null;
+  volume: number | null;
+  marketCap: number | null;
+  beta: number | null;
+  trailingPE: number | null;
+  forwardPE: number | null;
+  dividendYield: number | null;
+  exDividendDate: string | null;
+  earningsTimestamp: string | null;
+  fetchedAt: string;
+  source: "yahoo";
+};
+
 export type IngestArtifacts = {
   fec: {
     candidates: FecCandidate[];

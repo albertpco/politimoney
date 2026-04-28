@@ -73,6 +73,11 @@ type DirectoryEntry = FeedIndexEntry & {
   billType?: string;
   congress?: string;
   hasLinkedVote?: boolean;
+  billSponsor?: string;
+  billSponsorParty?: string;
+  billSponsorState?: string;
+  billLatestAction?: string;
+  billLatestActionDate?: string;
   ticker?: string;
   memberName?: string;
   transactionType?: string;
@@ -168,6 +173,11 @@ async function hydrateEntries(section: DatasetKey, rows: FeedIndexEntry[]): Prom
         billType,
         congress: String(detail?.bill.congress ?? tagAt(entry, 0) ?? ""),
         hasLinkedVote: Boolean(detail?.linkedVotes?.length),
+        billSponsor: detail?.bill.sponsor,
+        billSponsorParty: detail?.bill.sponsorParty,
+        billSponsorState: detail?.bill.sponsorState,
+        billLatestAction: detail?.bill.latestActionText ?? detail?.bill.status,
+        billLatestActionDate: detail?.bill.latestActionDate,
       };
     });
   }
@@ -445,10 +455,28 @@ export function DirectoryPage({ section }: { section: DatasetKey }) {
               >
                 <span className="min-w-0 flex-1">
                   <strong className="block truncate">{entry.label}</strong>
-                  <span className="pt-muted block text-xs">{entry.summary ?? entry.id}</span>
+                  <span className="pt-muted block text-xs">
+                    {section === "bills"
+                      ? [
+                          entry.summary ?? entry.id,
+                          entry.billSponsor
+                            ? `Sponsor: ${entry.billSponsor}${entry.billSponsorParty ? ` (${entry.billSponsorParty}${entry.billSponsorState ? `-${entry.billSponsorState}` : ""})` : ""}`
+                            : null,
+                          entry.billLatestAction
+                            ? `Latest: ${entry.billLatestAction}${entry.billLatestActionDate ? ` · ${entry.billLatestActionDate}` : ""}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : entry.summary ?? entry.id}
+                  </span>
                 </span>
                 <span className="directory-meta pt-muted text-xs">
-                  {amount ?? [entry.committeeType, entry.transactionDate ?? entry.voteDate, entry.rollCallNumber ? `Roll call ${entry.rollCallNumber}` : null, entry.tags?.slice(0, 2).join(" · ")].filter(Boolean)[0] ?? entry.id}
+                  {section === "bills"
+                    ? entry.hasLinkedVote
+                      ? "Vote linked"
+                      : "No vote yet"
+                    : amount ?? [entry.committeeType, entry.transactionDate ?? entry.voteDate, entry.rollCallNumber ? `Roll call ${entry.rollCallNumber}` : null, entry.tags?.slice(0, 2).join(" · ")].filter(Boolean)[0] ?? entry.id}
                 </span>
               </Link>
             );

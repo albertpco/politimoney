@@ -351,9 +351,10 @@ function ContextFilterBar() {
     <div className="pt-panel mb-4 flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
       <span className="pt-kicker">Quick Starts</span>
       {[
-        ["Rank all PACs by total receipts", "/search?q=Rank%20all%20PACs%20by%20total%20receipts"],
-        ["Who are the top funded members of Congress?", "/search?q=Who%20are%20the%20top%20funded%20members%20of%20Congress%3F"],
-        ["Compare California and Texas on outcomes", "/search?q=Compare%20California%20and%20Texas%20on%20outcomes"],
+        ["Top PACs", "/pacs"],
+        ["Members", "/members"],
+        ["Bills", "/bills"],
+        ["Compare states", "/compare"],
       ].map(([label, href]) => (
         <Link key={href} href={href} className="pt-button-secondary px-3 py-1 text-slate-700">
           {label}

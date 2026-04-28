@@ -119,13 +119,14 @@ export function HomePage() {
       <main className="min-w-0 flex-1 space-y-6">
         <QueryHero
           title="Political money made legible."
-          subtitle="PolitiMoney turns campaign finance, lobbying, and roll-call records into answers normal people can use. Ask a question in plain English, get the ranking, the funding breakdown, the vote record, and the source links."
+          subtitle="PolitiMoney turns campaign finance, lobbying, and roll-call records into answers normal people can use. Search a person, PAC, bill, or state, then follow the funding to the vote."
           examples={[
-            { label: "Rank all PACs by total receipts", href: "/search?q=Rank%20all%20PACs%20by%20total%20receipts" },
-            { label: "Who are the top funded members of Congress?", href: "/search?q=Who%20are%20the%20top%20funded%20members%20of%20Congress%3F" },
-            { label: "How did members vote on the latest defense bill?", href: "/search?q=How%20did%20members%20vote%20on%20the%20latest%20defense%20bill%3F" },
-            { label: "Compare California and Texas on education outcomes", href: "/search?q=Compare%20California%20and%20Texas%20on%20education%20outcomes" },
-            { label: "Show me the top federal contractors by award amount", href: "/search?q=Show%20me%20the%20top%20federal%20contractors%20by%20award%20amount" },
+            { label: "Top PACs by receipts", href: "/pacs" },
+            { label: "Top funded members", href: "/members" },
+            { label: "Search: Pelosi", href: "/search?q=Pelosi" },
+            { label: "Search: California senator", href: "/search?q=California+senator" },
+            { label: "Compare states", href: "/compare" },
+            { label: "Browse bills", href: "/bills" },
           ]}
         />
 

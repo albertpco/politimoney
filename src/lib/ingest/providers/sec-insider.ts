@@ -3,6 +3,7 @@ import type {
   FecCommittee,
   InsiderTrade,
   InsiderTradeSummary,
+  InsiderTransactionType,
   ContractorProfile,
 } from "@/lib/ingest/types";
 
@@ -154,13 +155,184 @@ function xmlBool(xml: string, tag: string): boolean {
   return value === "1" || value.toLowerCase() === "true";
 }
 
-function parseTransactionCode(code: string): InsiderTrade["transactionType"] {
+const KNOWN_TRANSACTION_CODES: ReadonlySet<InsiderTransactionType> = new Set([
+  "P",
+  "S",
+  "S-OE",
+  "M",
+  "A",
+  "D",
+  "F",
+  "G",
+  "I",
+  "J",
+  "X",
+  "C",
+  "V",
+  "OE",
+]);
+
+const ACQUIRE_CODES: ReadonlySet<InsiderTransactionType> = new Set([
+  "P",
+  "A",
+  "M",
+]);
+
+const DISPOSE_CODES: ReadonlySet<InsiderTransactionType> = new Set([
+  "S",
+  "S-OE",
+  "D",
+  "F",
+]);
+
+function parseTransactionCode(code: string): InsiderTransactionType {
   const upper = code.toUpperCase();
-  if (upper === "P") return "P";
-  if (upper === "S") return "S";
-  if (upper === "M") return "M";
-  if (upper === "A") return "A";
-  return "A"; // default to award for unknown codes
+  if (KNOWN_TRANSACTION_CODES.has(upper as InsiderTransactionType)) {
+    return upper as InsiderTransactionType;
+  }
+  return "OTHER";
+}
+
+function nestedValue(xml: string, tag: string): string {
+  const block = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "i"))?.[1];
+  if (!block) return "";
+  return xmlText(block, "value");
+}
+
+function signedShares(
+  shares: number,
+  type: InsiderTransactionType,
+): number | null {
+  if (ACQUIRE_CODES.has(type)) return shares;
+  if (DISPOSE_CODES.has(type)) return -shares;
+  return null;
+}
+
+function computeOwnershipDelta(
+  signed: number | null,
+  ownedAfter: number | undefined,
+): number | undefined {
+  if (signed === null) return undefined;
+  if (ownedAfter === undefined) return undefined;
+  const before = ownedAfter - signed;
+  if (!Number.isFinite(before) || before === 0) return undefined;
+  return Math.round((signed / before) * 10000) / 100;
+}
+
+function parseTransactionBlock(
+  txn: string,
+  isDerivative: boolean,
+  context: {
+    issuerCik: string;
+    issuerName: string;
+    issuerTicker: string;
+    ownerName: string;
+    ownerCik: string;
+    isDirector: boolean;
+    isOfficer: boolean;
+    isTenPercentOwner: boolean;
+    isOther: boolean;
+    officerTitle: string;
+    filingDate: string;
+  },
+): InsiderTrade | null {
+  const transactionDate = nestedValue(txn, "transactionDate");
+  const code = xmlText(
+    txn.match(/<transactionCoding>([\s\S]*?)<\/transactionCoding>/i)?.[1] ?? "",
+    "transactionCode",
+  );
+
+  const amountsBlock =
+    txn.match(/<transactionAmounts>([\s\S]*?)<\/transactionAmounts>/i)?.[1] ??
+    "";
+  const sharesStr = nestedValue(amountsBlock, "transactionShares");
+  const priceStr = nestedValue(amountsBlock, "transactionPricePerShare");
+
+  const shares = Number.parseFloat(sharesStr) || 0;
+  const pricePerShare = Number.parseFloat(priceStr) || 0;
+
+  if (!code || shares === 0) return null;
+
+  const postBlock =
+    txn.match(/<postTransactionAmounts>([\s\S]*?)<\/postTransactionAmounts>/i)?.[1] ??
+    "";
+  const ownedAfterStr = nestedValue(
+    postBlock,
+    "sharesOwnedFollowingTransaction",
+  );
+  const ownedAfterParsed = Number.parseFloat(ownedAfterStr);
+  const sharesOwnedAfter = Number.isFinite(ownedAfterParsed)
+    ? ownedAfterParsed
+    : undefined;
+
+  const ownershipBlock =
+    txn.match(/<ownershipNature>([\s\S]*?)<\/ownershipNature>/i)?.[1] ?? "";
+  const directOrIndirectRaw = nestedValue(
+    ownershipBlock,
+    "directOrIndirectOwnership",
+  ).toUpperCase();
+  const directOrIndirect: InsiderTrade["directOrIndirect"] =
+    directOrIndirectRaw === "D" || directOrIndirectRaw === "I"
+      ? directOrIndirectRaw
+      : undefined;
+
+  const transactionType = parseTransactionCode(code);
+  const signed = signedShares(shares, transactionType);
+  const ownershipDelta = computeOwnershipDelta(signed, sharesOwnedAfter);
+
+  const officerTitle = context.officerTitle;
+  const isCeo = /\b(CEO|chief executive)\b/i.test(officerTitle);
+  const isCfo = /\b(CFO|chief financial)\b/i.test(officerTitle);
+
+  const trade: InsiderTrade = {
+    cik: context.issuerCik,
+    ticker: context.issuerTicker || "N/A",
+    companyName: context.issuerName || "Unknown",
+    insiderName: context.ownerName || "Unknown",
+    insiderCik: context.ownerCik,
+    insiderTitle: officerTitle || undefined,
+    isDirector: context.isDirector,
+    isOfficer: context.isOfficer,
+    isTenPercentOwner: context.isTenPercentOwner,
+    isOther: context.isOther,
+    isCeo,
+    isCfo,
+    isDerivative,
+    transactionType,
+    shares,
+    pricePerShare,
+    totalValue: Math.round(shares * pricePerShare * 100) / 100,
+    transactionDate: transactionDate || context.filingDate,
+    filingDate: context.filingDate,
+    sharesOwnedAfter,
+    ownershipDelta,
+    directOrIndirect,
+  };
+
+  if (isDerivative) {
+    const underlyingBlock =
+      txn.match(/<underlyingSecurity>([\s\S]*?)<\/underlyingSecurity>/i)?.[1] ??
+      "";
+    const underlyingTitle = nestedValue(
+      underlyingBlock,
+      "underlyingSecurityTitle",
+    );
+    const underlyingSharesStr = nestedValue(
+      underlyingBlock,
+      "underlyingSecurityShares",
+    );
+    const underlyingShares = Number.parseFloat(underlyingSharesStr);
+    const exerciseDate = nestedValue(txn, "exerciseDate");
+    const expirationDate = nestedValue(txn, "expirationDate");
+
+    if (underlyingTitle) trade.derivativeUnderlyingTitle = underlyingTitle;
+    if (Number.isFinite(underlyingShares))
+      trade.derivativeUnderlyingShares = underlyingShares;
+    if (exerciseDate) trade.derivativeExerciseDate = exerciseDate;
+    if (expirationDate) trade.derivativeExpirationDate = expirationDate;
+  }
+
+  return trade;
 }
 
 function parseForm4Xml(
@@ -175,74 +347,48 @@ function parseForm4Xml(
   const issuerCik = xmlText(xml, "issuerCik") || companyCik;
   const ownerName = xmlText(xml, "rptOwnerName");
 
-  // Extract relationship info from reportingOwnerRelationship block
+  const ownerIdBlock =
+    xml.match(/<reportingOwnerId>([\s\S]*?)<\/reportingOwnerId>/i)?.[1] ?? "";
+  const ownerCik = xmlText(ownerIdBlock, "rptOwnerCik").replace(/^0+/, "");
+
   const relBlock =
     xml.match(
       /<reportingOwnerRelationship>([\s\S]*?)<\/reportingOwnerRelationship>/i,
     )?.[1] ?? "";
   const isDirector = xmlBool(relBlock, "isDirector");
   const isOfficer = xmlBool(relBlock, "isOfficer");
+  const isTenPercentOwner = xmlBool(relBlock, "isTenPercentOwner");
+  const isOther = xmlBool(relBlock, "isOther");
   const officerTitle = xmlText(relBlock, "officerTitle");
 
-  // Parse non-derivative transactions
-  const txnMatches = xml.matchAll(
+  const context = {
+    issuerCik,
+    issuerName,
+    issuerTicker,
+    ownerName,
+    ownerCik,
+    isDirector,
+    isOfficer,
+    isTenPercentOwner,
+    isOther,
+    officerTitle,
+    filingDate,
+  };
+
+  const nonDerivMatches = xml.matchAll(
     /<nonDerivativeTransaction>([\s\S]*?)<\/nonDerivativeTransaction>/gi,
   );
+  for (const m of nonDerivMatches) {
+    const trade = parseTransactionBlock(m[1], false, context);
+    if (trade) trades.push(trade);
+  }
 
-  for (const txnMatch of txnMatches) {
-    const txn = txnMatch[1];
-
-    const transactionDate = xmlText(txn, "transactionDate")
-      ? xmlText(
-          txn.match(/<transactionDate>([\s\S]*?)<\/transactionDate>/i)?.[1] ??
-            "",
-          "value",
-        )
-      : "";
-    const code = xmlText(
-      txn.match(
-        /<transactionCoding>([\s\S]*?)<\/transactionCoding>/i,
-      )?.[1] ?? "",
-      "transactionCode",
-    );
-
-    const amountsBlock =
-      txn.match(
-        /<transactionAmounts>([\s\S]*?)<\/transactionAmounts>/i,
-      )?.[1] ?? "";
-    const sharesStr = xmlText(
-      amountsBlock.match(
-        /<transactionShares>([\s\S]*?)<\/transactionShares>/i,
-      )?.[1] ?? "",
-      "value",
-    );
-    const priceStr = xmlText(
-      amountsBlock.match(
-        /<transactionPricePerShare>([\s\S]*?)<\/transactionPricePerShare>/i,
-      )?.[1] ?? "",
-      "value",
-    );
-
-    const shares = Number.parseFloat(sharesStr) || 0;
-    const pricePerShare = Number.parseFloat(priceStr) || 0;
-
-    if (!code || shares === 0) continue;
-
-    trades.push({
-      cik: issuerCik,
-      ticker: issuerTicker || "N/A",
-      companyName: issuerName || "Unknown",
-      insiderName: ownerName || "Unknown",
-      insiderTitle: officerTitle || undefined,
-      isDirector,
-      isOfficer,
-      transactionType: parseTransactionCode(code),
-      shares,
-      pricePerShare,
-      totalValue: Math.round(shares * pricePerShare * 100) / 100,
-      transactionDate: transactionDate || filingDate,
-      filingDate,
-    });
+  const derivMatches = xml.matchAll(
+    /<derivativeTransaction>([\s\S]*?)<\/derivativeTransaction>/gi,
+  );
+  for (const m of derivMatches) {
+    const trade = parseTransactionBlock(m[1], true, context);
+    if (trade) trades.push(trade);
   }
 
   return trades;
@@ -361,14 +507,23 @@ function buildInsiderTradeSummaries(
     let totalSells = 0;
     let buyValue = 0;
     let sellValue = 0;
+    let acquiredValue = 0;
+    let derivativeTradeCount = 0;
 
     for (const trade of tickerTrades) {
+      if (trade.isDerivative) derivativeTradeCount++;
       if (trade.transactionType === "P") {
         totalBuys++;
         buyValue += trade.totalValue;
-      } else if (trade.transactionType === "S") {
+        acquiredValue += trade.totalValue;
+      } else if (
+        trade.transactionType === "S" ||
+        trade.transactionType === "S-OE"
+      ) {
         totalSells++;
         sellValue += trade.totalValue;
+      } else if (trade.transactionType === "A") {
+        acquiredValue += trade.totalValue;
       }
     }
 
@@ -407,8 +562,10 @@ function buildInsiderTradeSummaries(
       totalSells,
       buyValue: Math.round(buyValue * 100) / 100,
       sellValue: Math.round(sellValue * 100) / 100,
+      acquiredValue: Math.round(acquiredValue * 100) / 100,
       netValue: Math.round((buyValue - sellValue) * 100) / 100,
       tradeCount: tickerTrades.length,
+      derivativeTradeCount,
       recentTrades,
       fecCommitteeId: fecMatch?.committeeId,
       fecCommitteeName: fecMatch?.name,

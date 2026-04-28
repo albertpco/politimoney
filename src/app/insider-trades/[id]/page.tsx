@@ -10,10 +10,46 @@ import {
   UtilityRail,
 } from "@/components/ui-primitives";
 import { getInsiderTradesByCompanyRepository } from "@/lib/data/repository";
+import type { InsiderTransactionType } from "@/lib/ingest/types";
 import { fmtCompact, fmtMoney } from "@/lib/format";
 import { evidenceLinks } from "@/lib/site-data";
 
 export const revalidate = 3600;
+
+function formatTransactionType(type: InsiderTransactionType): string {
+  switch (type) {
+    case "P":
+      return "Purchase";
+    case "S":
+      return "Sale";
+    case "S-OE":
+      return "Sale (OE)";
+    case "M":
+      return "Exercise";
+    case "A":
+      return "Award";
+    case "D":
+      return "Disposition";
+    case "F":
+      return "Tax withholding";
+    case "G":
+      return "Gift";
+    case "I":
+      return "Discretionary";
+    case "J":
+      return "Other acquisition";
+    case "X":
+      return "Option exercise";
+    case "C":
+      return "Conversion";
+    case "V":
+      return "Voluntary report";
+    case "OE":
+      return "Option expiration";
+    default:
+      return "Other";
+  }
+}
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -100,13 +136,7 @@ export default async function InsiderTradeDetailPage({ params }: Props) {
                   t.transactionDate,
                   t.insiderName,
                   t.insiderTitle ?? "---",
-                  t.transactionType === "P"
-                    ? "Purchase"
-                    : t.transactionType === "S"
-                      ? "Sale"
-                      : t.transactionType === "M"
-                        ? "Exercise"
-                        : t.transactionType,
+                  formatTransactionType(t.transactionType),
                   t.shares.toLocaleString(),
                   fmtMoney(t.pricePerShare),
                   fmtCompact(t.totalValue),

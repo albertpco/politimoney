@@ -488,20 +488,50 @@ export type CongressTrade = {
 
 // --- SEC EDGAR insider trading (Form 4) types ---
 
+export type InsiderTransactionType =
+  | "P"
+  | "S"
+  | "S-OE"
+  | "M"
+  | "A"
+  | "D"
+  | "F"
+  | "G"
+  | "I"
+  | "J"
+  | "X"
+  | "C"
+  | "V"
+  | "OE"
+  | "OTHER";
+
 export type InsiderTrade = {
   cik: string;
   ticker: string;
   companyName: string;
   insiderName: string;
+  insiderCik: string;
   insiderTitle?: string;
   isDirector: boolean;
   isOfficer: boolean;
-  transactionType: "P" | "S" | "M" | "A";
+  isTenPercentOwner: boolean;
+  isOther: boolean;
+  isCeo: boolean;
+  isCfo: boolean;
+  isDerivative: boolean;
+  transactionType: InsiderTransactionType;
   shares: number;
   pricePerShare: number;
   totalValue: number;
   transactionDate: string;
   filingDate: string;
+  sharesOwnedAfter?: number;
+  ownershipDelta?: number;
+  directOrIndirect?: "D" | "I";
+  derivativeUnderlyingTitle?: string;
+  derivativeUnderlyingShares?: number;
+  derivativeExerciseDate?: string;
+  derivativeExpirationDate?: string;
 };
 
 export type InsiderTradeSummary = {
@@ -512,8 +542,10 @@ export type InsiderTradeSummary = {
   totalSells: number;
   buyValue: number;
   sellValue: number;
+  acquiredValue: number;
   netValue: number;
   tradeCount: number;
+  derivativeTradeCount: number;
   recentTrades: InsiderTrade[];
   fecCommitteeId?: string;
   fecCommitteeName?: string;

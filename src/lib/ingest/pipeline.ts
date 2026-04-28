@@ -23,6 +23,10 @@ import { ingestStateOutcomes } from "@/lib/ingest/providers/outcomes";
 import { ingestCongressTradeDisclosures } from "@/lib/ingest/providers/congress-trades";
 import { ingestLdaData } from "@/lib/ingest/providers/lda";
 import { ingestSecInsiderData } from "@/lib/ingest/providers/sec-insider";
+import {
+  ingestSecCorporateFilings,
+  type SecFilingsCompanyInput,
+} from "@/lib/ingest/providers/sec-filings";
 import { ingestUsaSpendingData } from "@/lib/ingest/providers/usaspending";
 import {
   saveCongressTradeDisclosures,
@@ -31,6 +35,7 @@ import {
   saveInsiderTradeArtifacts,
   saveLaunchSummary,
   saveLobbyingArtifacts,
+  saveSecCorporateFilings,
   saveUsaSpendingArtifacts,
   saveVoteFundingSummaries,
 } from "@/lib/ingest/storage";
@@ -381,6 +386,7 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
   // --- SEC EDGAR insider trading (Form 4 filings) ---
   let secStatus: SourceRunStatus;
   const secWarnings: string[] = [];
+  const secFilingsCompanyInputs: SecFilingsCompanyInput[] = [];
   try {
     console.log("[pipeline] fetching SEC EDGAR insider trade data");
     const secResult = await ingestSecInsiderData({
@@ -398,8 +404,43 @@ export async function runIngestionPipeline(): Promise<IngestRunSummary> {
     console.log(
       `[pipeline] SEC: ${secResult.trades.length} trades, ${secResult.summaries.length} companies`,
     );
+
+    const seenCiks = new Set<string>();
+    for (const summary of secResult.summaries) {
+      if (!summary.cik || seenCiks.has(summary.cik)) continue;
+      seenCiks.add(summary.cik);
+      secFilingsCompanyInputs.push({
+        cik: summary.cik,
+        ticker: summary.ticker,
+        companyName: summary.companyName,
+      });
+    }
   } catch (error) {
     secStatus = sourceFailure("sec", error);
+  }
+
+  // --- SEC EDGAR corporate filings (13D, 8-K, NT-10K/Q, S-3, 424B5) ---
+  try {
+    if (secFilingsCompanyInputs.length > 0) {
+      console.log(
+        `[pipeline] fetching SEC EDGAR corporate filings for ${secFilingsCompanyInputs.length} companies`,
+      );
+      const filingsResult = await ingestSecCorporateFilings({
+        companies: secFilingsCompanyInputs,
+        perFormLimit: 20,
+      });
+      await saveSecCorporateFilings(filingsResult.filings);
+      secWarnings.push(...filingsResult.warnings);
+      console.log(
+        `[pipeline] SEC corporate filings: ${filingsResult.filings.length} filings`,
+      );
+    } else {
+      console.log("[pipeline] skipping SEC corporate filings: no companies resolved");
+    }
+  } catch (error) {
+    secWarnings.push(
+      `sec-filings: ${error instanceof Error ? error.message : "unknown error"}`,
+    );
   }
 
   // --- LDA: Senate lobbying disclosures (uses FEC committees, members, contractors for crosswalk) ---

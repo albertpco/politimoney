@@ -2355,3 +2355,38 @@ export async function getInsiderTradesByCompanyRepository(
 
   return { summary: summary ?? null, trades: companyTrades };
 }
+
+// --- SEC EDGAR corporate filings (non-Form-4) repository functions ---
+
+export async function getSecCorporateFilings(options?: {
+  cik?: string;
+  ticker?: string;
+  form?: string;
+  limit?: number;
+}) {
+  const { readSecCorporateFilings } = await import("@/lib/ingest/storage");
+  const filings = await readSecCorporateFilings();
+
+  const cik = options?.cik?.trim();
+  const ticker = options?.ticker?.trim().toUpperCase();
+  const form = options?.form?.trim();
+  const limit = options?.limit;
+
+  let filtered = filings;
+  if (cik) {
+    filtered = filtered.filter((f) => f.cik === cik);
+  }
+  if (ticker) {
+    filtered = filtered.filter((f) => f.ticker.toUpperCase() === ticker);
+  }
+  if (form) {
+    filtered = filtered.filter((f) => f.form === form);
+  }
+
+  filtered = [...filtered].sort(
+    (a, b) =>
+      new Date(b.filingDate).getTime() - new Date(a.filingDate).getTime(),
+  );
+
+  return typeof limit === "number" ? filtered.slice(0, limit) : filtered;
+}

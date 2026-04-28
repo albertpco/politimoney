@@ -23,6 +23,7 @@ import type {
   IngestRunSummary,
   InsiderTrade,
   InsiderTradeSummary,
+  SecCorporateFiling,
   LobbyingClientProfile,
   LobbyingFiling,
   LobbyistContribution,
@@ -435,6 +436,19 @@ export async function saveInsiderTradeArtifacts(
   await ensureDirs();
   await writeJson(path.join(LATEST_DIR, "sec.insider-trades.json"), trades);
   await writeJson(path.join(LATEST_DIR, "sec.insider-trade-summaries.json"), summaries);
+}
+
+// --- SEC EDGAR corporate filings (non-Form-4) readers and writers ---
+
+export async function readSecCorporateFilings(): Promise<SecCorporateFiling[]> {
+  return readJsonOptional(path.join(LATEST_DIR, "sec-filings.json"), []);
+}
+
+export async function saveSecCorporateFilings(
+  filings: SecCorporateFiling[],
+): Promise<void> {
+  await ensureDirs();
+  await writeJson(path.join(LATEST_DIR, "sec-filings.json"), filings);
 }
 
 // --- Congress STOCK Act trade disclosure readers and writers ---

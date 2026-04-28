@@ -63,7 +63,8 @@ function TopNav() {
       }}
     >
       <div className="mx-auto flex w-full max-w-7xl items-center gap-5 px-4 py-3">
-        <Link href="/" className="shrink-0">
+        <Link href="/" className="brand-link shrink-0" aria-label="PolitiMoney home">
+          <img src="/favicon.svg" alt="" width="28" height="28" className="brand-mark" />
           <span className="brand">
             Politi<span className="dot">·</span><span className="red">money</span>
           </span>

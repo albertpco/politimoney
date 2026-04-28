@@ -591,6 +591,17 @@ table.t .name { font-weight: 500; }
 }
 
 /* brand wordmark */
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.brand-mark {
+  display: block;
+  border-radius: 999px;
+  flex: none;
+}
 .brand {
   font-family: var(--font-fraunces), Georgia, serif;
   font-size: 22px;
